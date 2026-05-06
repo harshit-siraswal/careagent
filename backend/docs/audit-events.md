@@ -83,6 +83,7 @@ The API should create the audit row before returning PHI. If a response streams 
 | `document.malware_scan_completed` | `medical_document` | Yes | Malware scan result persisted. |
 | `document.viewed` | `medical_document` | Yes | Document metadata/facts viewed. |
 | `document.downloaded` | `medical_document` | Yes | Clean raw object downloaded through controlled URL. |
+| `document.download_denied` | `medical_document` | Yes | Raw object download denied because malware scan is not clean, actor lacks scope, or break-glass reason is missing. |
 | `document.status_viewed` | `medical_document` | Yes | Processing status viewed. |
 | `document.ocr_completed` | `document_processing_run` | Yes | OCR worker completed. |
 | `document.extraction_completed` | `document_processing_run` | Yes | Extraction worker completed. |
@@ -160,6 +161,16 @@ Audit metadata may include IDs, route names, permission names, status values, co
 - Full LLM prompts or completions containing PHI.
 - Secrets, tokens, signed URLs, webhook signatures, or provider credentials.
 - Full phone numbers unless necessary for incident review; prefer masked form.
+
+## Completeness Rules
+
+- Each OpenAPI operation with `x-phi: true` must map to exactly one catalogue action on success and one denied/error audit row when patient scope is known.
+- Resource-ID routes must audit the patient loaded from the resource, not a patient ID supplied by the body.
+- Replayed idempotent operations use the same domain action as the original operation, with `metadata_json.idempotent_replay = true` and no duplicated external side effect.
+- `document.downloaded` must never store signed URLs, object keys, full bucket paths, or raw document text in metadata. Use masked object references, `sha256`, scan status, and URL expiry timestamp.
+- `observation.created` audit metadata records source type, metric counts, observed time window, accepted/rejected counts, and raw-payload storage mode, not raw device payloads.
+- `call.placed`, `message.sent`, and `escalation.action_attempted` must include template/script IDs, policy decision IDs, simulation flag, and consent grant IDs used for authorization.
+- Admin break-glass reads must be bracketed by `admin.break_glass_started` and `admin.break_glass_ended` events, and every PHI action inside that window keeps its normal domain audit event.
 
 ## Hash Chain
 

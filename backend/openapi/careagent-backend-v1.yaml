@@ -26,6 +26,13 @@ tags:
   - name: Webhooks
   - name: Audit
 
+x-backend-invariants:
+  - Patient-scoped routes must resolve exactly one patient before PHI access.
+  - PHI reads and writes must create audit events, including denied attempts when patient scope is known.
+  - Document raw-object access is blocked until malware_scan_status is clean.
+  - Escalation, risk-event creation, document upload sessions, and outbound side effects must be idempotent.
+  - Observation ingestion must use batched writes, time partitioning or TimescaleDB, and source provenance.
+
 paths:
   /auth/session:
     post:
@@ -71,6 +78,7 @@ paths:
       x-required-role: [patient, admin]
       x-patient-scope: self-or-admin
       x-audit: patient.profile_created
+      x-phi: true
       requestBody:
         required: true
         content:
@@ -89,9 +97,10 @@ paths:
     get:
       tags: [Patients]
       summary: List patient profiles visible to the current actor.
-      x-required-role: [caretaker, doctor, nurse, admin]
+      x-required-role: [patient, caretaker, doctor, nurse, admin]
       x-patient-scope: accessible-patients
       x-audit: patient.roster_viewed
+      x-phi: true
       responses:
         '200':
           description: Visible patients.
@@ -229,6 +238,7 @@ paths:
       x-required-permission: consent:write
       x-patient-scope: patient_id
       x-audit: consent.granted
+      x-phi: true
       requestBody:
         required: true
         content:
@@ -255,6 +265,7 @@ paths:
       x-required-permission: consent:write
       x-patient-scope: patient_id
       x-audit: consent.revoked
+      x-phi: true
       requestBody:
         required: false
         content:
@@ -323,6 +334,7 @@ paths:
       x-required-permission: devices:write
       x-patient-scope: patient_id
       x-audit: device.registered
+      x-phi: true
       requestBody:
         required: true
         content:
@@ -380,7 +392,10 @@ paths:
       x-required-permission: observations:write
       x-patient-scope: patient_id
       x-audit: observation.created
+      x-phi: true
       x-idempotent: recommended
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
       requestBody:
         required: true
         content:
@@ -451,6 +466,7 @@ paths:
       x-required-permission: documents:write
       x-patient-scope: patient_id
       x-audit: document.upload_session_created
+      x-phi: true
       x-idempotent: required
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -488,6 +504,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentDetailResponse'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /patients/{patient_id}/documents/{document_id}/download:
+    parameters:
+      - $ref: '#/components/parameters/PatientId'
+      - $ref: '#/components/parameters/DocumentId'
+    post:
+      tags: [Documents]
+      summary: Create a short-lived controlled raw-document download URL.
+      description: >
+        Returns a signed object-storage URL only when the raw object belongs to
+        the requested patient, the actor has documents:read, and
+        malware_scan_status is clean. Pending, infected, failed, or quarantined
+        scan states return an error and write a denied audit event.
+      x-required-permission: documents:read
+      x-patient-scope: patient_id
+      x-audit: document.downloaded
+      x-phi: true
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentDownloadRequest'
+      responses:
+        '200':
+          description: Controlled download URL.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentDownloadResponse'
         default:
           $ref: '#/components/responses/Error'
 
@@ -672,6 +720,8 @@ paths:
       x-audit: medicine_dose.recorded
       x-phi: true
       x-idempotent: recommended
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
       requestBody:
         required: true
         content:
@@ -691,12 +741,50 @@ paths:
   /patients/{patient_id}/risk-events:
     parameters:
       - $ref: '#/components/parameters/PatientId'
+    get:
+      tags: [Risk]
+      summary: List patient risk events.
+      x-required-permission: risk:read
+      x-patient-scope: patient_id
+      x-audit: risk_event.viewed
+      x-phi: true
+      parameters:
+        - name: severity
+          in: query
+          schema:
+            $ref: '#/components/schemas/RiskSeverity'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, acknowledged, escalating, resolved, false_positive, cancelled]
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Risk events.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskEventListResponse'
+        default:
+          $ref: '#/components/responses/Error'
     post:
       tags: [Risk]
       summary: Create a rule-generated risk event.
       x-required-permission: risk:write
       x-patient-scope: patient_id
       x-audit: risk_event.created
+      x-phi: true
       x-idempotent: required
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -753,6 +841,8 @@ paths:
       x-audit: risk_event.acknowledged
       x-phi: true
       x-idempotent: recommended
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
       requestBody:
         required: false
         content:
@@ -909,6 +999,8 @@ paths:
       x-audit: agent.tool_called
       x-phi: maybe
       x-idempotent: recommended
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
       requestBody:
         required: true
         content:
@@ -1000,6 +1092,7 @@ paths:
       x-required-permission: audit:read
       x-patient-scope: patient_id
       x-audit: audit_logs.viewed
+      x-phi: true
       responses:
         '200':
           description: Audit logs.
@@ -1071,6 +1164,14 @@ components:
       name: Idempotency-Key
       in: header
       required: true
+      schema:
+        type: string
+        minLength: 12
+        maxLength: 200
+    IdempotencyKeyOptional:
+      name: Idempotency-Key
+      in: header
+      required: false
       schema:
         type: string
         minLength: 12
@@ -1607,6 +1708,45 @@ components:
               type: object
               additionalProperties:
                 type: string
+    DocumentDownloadRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          description: Required by policy for admin break-glass or incident review downloads.
+        requested_filename:
+          type: string
+          description: Optional client display filename; server must not trust it for storage lookup.
+    DocumentDownloadResponse:
+      type: object
+      required: [document_id, malware_scan_status, download, audit_log_id]
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        malware_scan_status:
+          type: string
+          enum: [clean]
+        download:
+          type: object
+          required: [method, url, expires_at, headers]
+          properties:
+            method:
+              type: string
+              enum: [GET]
+            url:
+              type: string
+              format: uri
+            expires_at:
+              type: string
+              format: date-time
+            headers:
+              type: object
+              additionalProperties:
+                type: string
+        audit_log_id:
+          type: string
+          format: uuid
     MedicalDocument:
       type: object
       required: [id, patient_id, original_filename, file_type, malware_scan_status, ocr_status, extraction_status, created_at]
@@ -1915,6 +2055,14 @@ components:
             resolved_at:
               type: string
               format: date-time
+    RiskEventListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RiskEvent'
     Alert:
       type: object
       required: [id, patient_id, severity, title, body, status, created_at]

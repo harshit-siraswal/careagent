@@ -11,6 +11,21 @@ This test plan is written against `backend/openapi/careagent-backend-v1.yaml` an
 - Queue publishing is tested through `outbox_events` rows and fake worker drains.
 - Every API response includes a `request_id`.
 
+## Contract and Migration Tests
+
+| Test | Assertions |
+| --- | --- |
+| `test_openapi_patient_scoped_routes_have_authz_audit_annotations` | Every patient-scoped route has `x-patient-scope`, `x-required-permission` or `x-required-role`, and `x-audit`. |
+| `test_openapi_phi_routes_have_catalogued_audit_action` | Every route with `x-phi: true` maps to an action in `backend/docs/audit-events.md`. |
+| `test_openapi_idempotent_routes_require_or_accept_header` | Required idempotent routes include required `Idempotency-Key`; recommended routes accept optional `Idempotency-Key`. |
+| `test_migrations_apply_in_order_001_002_003` | Fresh PostgreSQL database applies all backend migrations without errors. |
+| `test_migration_core_tables_and_constraints_exist` | Auth, patient grants, consent ledger, observations, documents, medicines, risk, escalation, agent tool calls, idempotency, outbox, and audit tables exist with expected uniqueness/FK constraints. |
+| `test_migration_rls_enabled_for_phi_tables` | Patient-scoped PHI tables have RLS enabled and expected policies. |
+| `test_migration_audit_logs_append_only_trigger_exists` | Update/delete attempts on `audit_logs` fail. |
+| `test_migration_observation_partition_indexes_exist` | Default and generated partitions have patient/metric/time index and BRIN time index. |
+| `test_migration_object_storage_document_fields_exist` | `medical_documents` has bucket/key/sha256/access policy/malware scan fields and unique `(patient_id, sha256)`. |
+| `test_migration_outbox_and_idempotency_uniqueness` | `outbox_events.event_key`, `idempotency_keys.key`, risk-event keys, escalation run keys, and dispatch attempt keys prevent duplicate side effects. |
+
 ## Unit Tests
 
 ### Auth and RBAC
@@ -56,6 +71,8 @@ This test plan is written against `backend/openapi/careagent-backend-v1.yaml` an
 | `test_document_upload_session_returns_signed_storage_url` | API creates metadata with `malware_scan_status = pending` and signed upload target. |
 | `test_duplicate_document_hash_is_idempotent_per_patient` | Same patient/sha256 returns existing document/session according to idempotency policy. |
 | `test_document_download_blocked_until_clean_scan` | Pending/infected/failed scan states deny raw object access. |
+| `test_document_download_returns_controlled_signed_url_after_clean_scan` | Clean document returns a short-lived signed URL, writes `document.downloaded`, and does not expose object bucket/key in list/detail responses. |
+| `test_document_download_denied_audit_redacts_signed_url` | Denied or successful download audit metadata never includes signed URLs, object keys, or raw text. |
 | `test_infected_document_is_quarantined_and_not_ocrd` | Malware worker marks quarantine and no OCR event is published. |
 | `test_extraction_review_updates_fact_status` | Approve/correct/reject changes fact state and writes audit event. |
 | `test_patient_question_uses_only_approved_facts` | RAG/answer layer excludes pending/rejected facts. |
@@ -75,6 +92,7 @@ This test plan is written against `backend/openapi/careagent-backend-v1.yaml` an
 | --- | --- |
 | `test_risk_event_creation_requires_idempotency_key` | Missing key returns 400 for API-created risk event. |
 | `test_risk_event_unique_by_patient_and_key` | Replay returns original risk event and does not duplicate alerts. |
+| `test_risk_event_list_is_patient_scoped` | `GET /patients/{patient_id}/risk-events` returns only scoped events and audits `risk_event.viewed`. |
 | `test_high_risk_creates_alert` | High/critical event creates patient alert and outbox notification event. |
 | `test_escalation_start_is_idempotent` | Repeated request returns same `escalation_run_id`; no duplicate action rows. |
 | `test_escalation_unique_by_risk_event_and_policy` | Different header key for same risk/policy returns existing run with audit metadata. |
@@ -131,9 +149,10 @@ Expected result: acknowledgement updates risk/alert state and audits the actor.
 3. Drain malware scan with clean result.
 4. Drain OCR and extraction workers.
 5. Approve one extracted medicine fact and correct one lab fact.
-6. Ask a document question.
+6. Request raw-document download before and after the clean scan gate.
+7. Ask a document question.
 
-Expected result: pending scan blocks OCR; clean scan enables extraction; answer contains citations and audit ID.
+Expected result: pending scan blocks download/OCR; clean scan enables controlled download and extraction; answer contains citations and audit ID.
 
 ### Medicine Reminder and Missed Dose
 
@@ -195,6 +214,8 @@ Expected result: all attempts return 403 or 404 according to leak-prevention pol
 
 Backend MVP is not ready until:
 
+- Backend migrations apply in order and prove schema/RLS/idempotency/audit immutability coverage.
+- OpenAPI route annotations match the authorization matrix and audit catalogue.
 - All RBAC matrix tests pass.
 - All PHI endpoints have audit assertions.
 - Escalation idempotency tests pass.

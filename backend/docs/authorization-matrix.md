@@ -82,6 +82,7 @@ Use exact strings in `patient_access_grants.permissions`.
 | `GET /patients/{patient_id}/documents` | Own | Granted | Granted | Granted | Break-glass | `documents:read` | `documents.list_viewed` |
 | `POST /patients/{patient_id}/documents` | Own | If granted | If granted | If granted | Break-glass | `documents:write` | `document.upload_session_created` |
 | `GET /patients/{patient_id}/documents/{document_id}` | Own | Granted | Granted | Granted | Break-glass | `documents:read` | `document.viewed` |
+| `POST /patients/{patient_id}/documents/{document_id}/download` | Own | Granted | Granted | Granted | Break-glass | `documents:read` plus clean malware scan | `document.downloaded` / `document.download_denied` |
 | `GET /patients/{patient_id}/documents/{document_id}/status` | Own | Granted | Granted | Granted | Break-glass | `documents:read` | `document.status_viewed` |
 | `POST /patients/{patient_id}/documents/{document_id}/review` | Own | If granted | If granted | If granted | Break-glass | `documents:write` | `document.extraction_reviewed` |
 | `POST /patients/{patient_id}/questions` | Own | Granted | Granted | Granted | Break-glass | `documents:read` | `document.question_answered` |
@@ -91,6 +92,7 @@ Use exact strings in `patient_access_grants.permissions`.
 | `POST /patients/{patient_id}/medicine-schedule` | Own | If granted | If granted | If granted | Break-glass | `medicines:write` | `medicine_schedule.upserted` |
 | `POST /patients/{patient_id}/dose-events` | Own | If granted | No default | If granted | Break-glass | `medicines:write` | `medicine_dose.recorded` |
 | `POST /patients/{patient_id}/risk-events` | System | No default | No default | No default | Admin/system | `risk:write` | `risk_event.created` |
+| `GET /patients/{patient_id}/risk-events` | Own | Granted | Granted | Granted | Break-glass | `risk:read` | `risk_event.viewed` |
 | `GET /patients/{patient_id}/alerts` | Own | Granted | Granted | Granted | Break-glass | `alerts:read` | `alerts.viewed` |
 | `POST /risk-events/{risk_event_id}/acknowledge` | Own | Granted | Granted | Granted | Break-glass | `alerts:write` | `risk_event.acknowledged` |
 | `POST /risk-events/{risk_event_id}/escalate` | Own/system | If granted | If granted | If granted | System/admin | `escalation:write` | `escalation.started` |
@@ -116,3 +118,25 @@ Use exact strings in `patient_access_grants.permissions`.
 10. Write audit event before returning PHI or after a denied PHI attempt.
 
 Denied requests for PHI routes still create an audit row with `outcome = denied` and the matched `patient_id` when known.
+
+## Resource-Specific Gates
+
+Raw document download:
+
+- The API never returns stored `file_uri`, bucket names, object keys, signed upload URLs, or signed download URLs from list/detail routes.
+- `POST /patients/{patient_id}/documents/{document_id}/download` loads the document by both `patient_id` and `document_id`; resource-ID mismatches must return 404 or 403 without confirming cross-patient ownership.
+- Download is denied unless `malware_scan_status = clean`. Pending, infected, failed, and quarantined documents must not be downloaded, OCR processed, extracted, indexed, or sent to an LLM.
+- Admin break-glass downloads require MFA and a non-empty reason. Audit metadata may include scan status and object hash, but not the signed URL.
+
+Observation ingestion:
+
+- The path `patient_id` is authoritative. Body items must not carry another patient ID.
+- Connector, mobile, OCR, and manual-entry actors need `observations:write` through patient ownership, a patient grant, or a system connector identity bound to the patient.
+- Batches must be bounded by the OpenAPI limit and written through partitioned observations or TimescaleDB hypertables with `(patient_id, metric_code, observed_at desc)` indexes.
+- Raw payload storage is split: small provenance payloads may use `observation_raw_payloads.payload_json`; large payloads use object storage and a redacted reference.
+
+Escalation and outbound action:
+
+- `POST /risk-events/{risk_event_id}/escalate` must check patient scope from the loaded risk event, not from request body data.
+- Voice, SMS, WhatsApp, Telegram, push, email, and location-sharing steps require active consent, active policy configuration, and approved templates or call scripts where applicable.
+- Replays with the same `Idempotency-Key` must return the stored response. Replays for the same `risk_event_id + policy_id` must return the existing run and add audit metadata noting the replay.

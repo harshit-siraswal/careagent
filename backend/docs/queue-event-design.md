@@ -2,6 +2,14 @@
 
 CareAgent should use a transactional outbox in PostgreSQL and Redis Streams, SQS, Pub/Sub, or a comparable durable queue for workers. API handlers write domain state and `outbox_events` rows in the same database transaction. A publisher worker moves pending outbox rows to queues and marks them published.
 
+## Migration Coverage Notes
+
+- `001_initial_backend_platform.sql` owns core API state: auth identities, user accounts, patient profiles, patient access grants, consent ledger, contacts, devices, partitioned observations, object-storage document metadata, medicines, risk events, alerts, escalation policies/runs/actions, conversations, agent tool calls, idempotency keys, outbox events, audit logs, and RLS policies.
+- `002_health_device_integrations.sql` extends the base with metric catalog, normalization rules, BLE profile catalog, connector definitions, connector accounts, sync runs, freshness/quality assessments, normalization errors, and simulator scenarios.
+- `003_channels_calls_escalation.sql` extends the base with provider configs, channel account links, approved message templates, approved call scripts, dispatch attempts, delivery receipts, call events, escalation acknowledgements, and escalation simulation runs.
+- The FastAPI migration runner must apply the three files in order and fail startup if the observed database lacks required RLS policies, observation partition indexes, audit immutability trigger, or idempotency/outbox uniqueness constraints.
+- A partition maintenance job must create future observation partitions with the same `(patient_id, metric_code, observed_at desc)` and BRIN indexes as the default partition, or use TimescaleDB hypertables with equivalent query plans.
+
 ## Queue Names
 
 | Queue | Producers | Consumers | Purpose |
@@ -33,6 +41,20 @@ Each `outbox_events` row has:
 - `status`, `attempts`, `next_attempt_at`, `published_at`, `last_error`.
 
 Workers must be idempotent. Reprocessing the same `event_key` must not duplicate risk events, calls, messages, dose events, or document facts.
+
+## Idempotency Boundaries
+
+| Operation | Boundary | Stored replay response |
+| --- | --- | --- |
+| Document upload session | `Idempotency-Key` plus patient and request hash; `medical_documents(patient_id, sha256)` prevents duplicate raw objects per patient. | Existing document metadata and a fresh signed upload URL when the original upload is incomplete. |
+| Observation batch | Optional `Idempotency-Key` or `source_batch_id`; fallback hash uses patient, source, metric codes, and observed window. | Accepted/rejected counts and one `observation.created` event. |
+| Dose event | Header or body idempotency key plus patient, schedule, scheduled time, and status. | Existing dose event. |
+| Risk event | Required `Idempotency-Key`; `risk_events(patient_id, idempotency_key)` is unique. | Existing risk event and related alert references. |
+| Escalation start | Required `Idempotency-Key`; `escalation_runs(idempotency_key)` and `(risk_event_id, policy_id)` are unique. | Existing run and action timeline without duplicate dispatch attempts. |
+| Outbound dispatch | `channel_dispatch_attempts.idempotency_key`; escalation actions use run, step, and attempt. | Existing provider attempt status. |
+| Webhook event | Provider config plus provider event/message/call ID and replay window. | Existing receipt/call event processing result. |
+
+Idempotency rows store a request hash. A replay with the same key and a different request hash must return 409 and audit `outcome = denied` or `error` according to the route policy.
 
 ## Standard Event Envelope
 
@@ -69,6 +91,7 @@ Workers must be idempotent. Reprocessing the same `event_key` must not duplicate
 | `document.scan_completed` | `patient_id`, `document_id`, `malware_scan_status` | `careagent.document.ocr` only when clean | `document_scan:{document_id}:{status}` |
 | `document.ocr_completed` | `patient_id`, `document_id`, `ocr_artifact_ref` | `careagent.document.extract` | `document_ocr:{document_id}:{ocr_run_id}` |
 | `document.extraction_completed` | `patient_id`, `document_id`, `fact_ids` | `careagent.document.index` after review | `document_extract:{document_id}:{run_id}` |
+| `document.download_requested` | `patient_id`, `document_id`, `malware_scan_status`, `allowed` | None; audit-only unless analytics-safe export is enabled | `document_download:{request_id}` |
 | `risk_event.created` | `patient_id`, `risk_event_id`, `severity`, `confidence`, `reason` | `careagent.escalation.run` for high/critical | `risk:{patient_id}:{rule}:{window}` |
 | `alert.created` | `patient_id`, `alert_id`, `risk_event_id`, `severity` | `careagent.notification.dispatch` | `alert:{alert_id}` |
 | `alert.acknowledged` | `patient_id`, `alert_id`, `acknowledged_by` | `careagent.escalation.run` | `alert_ack:{alert_id}` |
@@ -90,6 +113,8 @@ Observation writes can be high volume and bursty. The ingestion path should:
 6. Use indexes on `(patient_id, metric_code, observed_at desc)` and BRIN on `observed_at`.
 7. Emit one `observation.created` event per accepted batch, not one event per reading unless a rule needs immediate processing.
 8. Keep latest-vitals cache optional; source of truth remains partitioned observations.
+9. Avoid loading unbounded patient time ranges in API handlers. Require `limit` and time-window defaults; larger analytics windows should read rollups.
+10. Track ingestion lag, outbox lag, and partition write latency as SLO metrics. Critical-alert rules should use the newest normalized readings and stale-source flags.
 
 Recommended retention:
 
