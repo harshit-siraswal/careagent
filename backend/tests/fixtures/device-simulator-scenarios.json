@@ -1,9 +1,14 @@
 {
-  "version": "0.1.0",
-  "generated_for": "prompt-04-health-device-integrations",
+  "version": "0.2.0",
+  "generated_for": "prompt-04-health-device-integrations-and-prompt-09-risk-engine",
   "clock": {
     "timezone": "Asia/Kolkata",
     "default_start_at": "2026-05-06T18:30:00+05:30"
+  },
+  "simulator_modes": ["dry_run", "ingest", "replay"],
+  "risk_rule_set": {
+    "version": "risk_rules_mvp_v1",
+    "notes": "Thresholds are deterministic test placeholders and require clinical/safety review before production use."
   },
   "scenarios": [
     {
@@ -187,9 +192,12 @@
       ],
       "expected_risk_events": [
         {
+          "rule_id": "spo2_low_v1",
           "severity": "critical",
           "reason_contains": "SpO2",
-          "requires_policy_approval": true
+          "requires_policy_approval": true,
+          "requires_patient_confirmation": false,
+          "recommended_policy_action": "start_emergency_protocol"
         }
       ]
     },
@@ -219,9 +227,11 @@
       ],
       "expected_risk_events": [
         {
+          "rule_id": "blood_glucose_low_v1",
           "severity": "high",
           "reason_contains": "glucose",
-          "requires_patient_confirmation": true
+          "requires_patient_confirmation": true,
+          "recommended_policy_action": "prompt_patient_repeat_reading"
         }
       ]
     },
@@ -251,9 +261,11 @@
       ],
       "expected_risk_events": [
         {
+          "rule_id": "device_stale_v1",
           "severity": "low",
           "reason_contains": "stale",
-          "should_not_escalate_as_emergency": true
+          "should_not_escalate_as_emergency": true,
+          "recommended_policy_action": "prompt_patient_to_sync_device"
         }
       ]
     },
@@ -291,9 +303,212 @@
       ],
       "expected_risk_events": [
         {
+          "rule_id": "fall_detected_v1",
           "severity": "critical",
           "reason_contains": "fall",
-          "requires_policy_approval": true
+          "requires_policy_approval": true,
+          "recommended_policy_action": "start_emergency_protocol"
+        }
+      ]
+    },
+    {
+      "scenario_code": "heart_rate_rapid_drop_critical",
+      "display_name": "Fresh BLE heart-rate rapid drop creates critical candidate",
+      "source_type": "ble",
+      "connector_code": "ble_medical_profiles",
+      "supported_metrics": ["heart_rate"],
+      "patient_context": {
+        "age_band": "elderly",
+        "condition_profiles": ["cardiac_risk"],
+        "baseline_values": {
+          "heart_rate": 74
+        }
+      },
+      "observations": [
+        {
+          "offset_seconds": 0,
+          "metric_code": "heart_rate",
+          "value_numeric": 74,
+          "unit": "bpm",
+          "observed_at": "2026-05-06T18:30:00+05:30",
+          "source_label": "BLE Heart Rate Monitor",
+          "reliability_tier": "standard_ble",
+          "source_record_id": "ble_hr_drop_001",
+          "raw_payload": {
+            "profile": "heart_rate",
+            "characteristic_uuid": "00002a37-0000-1000-8000-00805f9b34fb",
+            "hex": "004a"
+          },
+          "expected_quality": {
+            "freshness": "fresh",
+            "quality_score_min": 0.85,
+            "quality_flags": []
+          }
+        },
+        {
+          "offset_seconds": 55,
+          "metric_code": "heart_rate",
+          "value_numeric": 36,
+          "unit": "bpm",
+          "observed_at": "2026-05-06T18:30:55+05:30",
+          "source_label": "BLE Heart Rate Monitor",
+          "reliability_tier": "standard_ble",
+          "source_record_id": "ble_hr_drop_002",
+          "raw_payload": {
+            "profile": "heart_rate",
+            "characteristic_uuid": "00002a37-0000-1000-8000-00805f9b34fb",
+            "hex": "0024"
+          },
+          "expected_quality": {
+            "freshness": "fresh",
+            "quality_score_min": 0.85,
+            "quality_flags": ["rapid_drop", "critical_low_value"]
+          }
+        }
+      ],
+      "expected_risk_events": [
+        {
+          "rule_id": "heart_rate_rapid_change_v1",
+          "severity": "critical",
+          "reason_contains": "heart rate",
+          "requires_policy_approval": true,
+          "recommended_policy_action": "start_high_priority_escalation"
+        }
+      ]
+    },
+    {
+      "scenario_code": "hypertensive_bp_repeat_required",
+      "display_name": "High blood pressure from reviewed manual source requests repeat reading",
+      "source_type": "manual",
+      "connector_code": "manual_entry",
+      "supported_metrics": ["blood_pressure_systolic", "blood_pressure_diastolic"],
+      "patient_context": {
+        "condition_profiles": ["hypertension"],
+        "active_thresholds": {
+          "blood_pressure_systolic_high": 180,
+          "blood_pressure_diastolic_high": 120
+        }
+      },
+      "observations": [
+        {
+          "offset_seconds": 0,
+          "metric_code": "blood_pressure_systolic",
+          "value_numeric": 184,
+          "unit": "mmHg",
+          "observed_at": "2026-05-06T18:30:00+05:30",
+          "source_label": "Manual BP entry",
+          "reliability_tier": "manual_or_ocr",
+          "source_record_id": "manual_bp_001_sys",
+          "group_id": "manual_bp_001",
+          "review_status": "approved",
+          "expected_quality": {
+            "freshness": "fresh",
+            "quality_score_min": 0.55,
+            "quality_flags": ["manual_source", "high_bp_value"]
+          }
+        },
+        {
+          "offset_seconds": 0,
+          "metric_code": "blood_pressure_diastolic",
+          "value_numeric": 118,
+          "unit": "mmHg",
+          "observed_at": "2026-05-06T18:30:00+05:30",
+          "source_label": "Manual BP entry",
+          "reliability_tier": "manual_or_ocr",
+          "source_record_id": "manual_bp_001_dia",
+          "group_id": "manual_bp_001",
+          "review_status": "approved",
+          "expected_quality": {
+            "freshness": "fresh",
+            "quality_score_min": 0.55,
+            "quality_flags": ["manual_source"]
+          }
+        }
+      ],
+      "expected_risk_events": [
+        {
+          "rule_id": "blood_pressure_high_v1",
+          "severity": "high",
+          "reason_contains": "blood pressure",
+          "requires_patient_confirmation": true,
+          "recommended_policy_action": "prompt_patient_repeat_reading"
+        }
+      ]
+    },
+    {
+      "scenario_code": "cgm_disconnected_stale_alert",
+      "display_name": "Continuous glucose connector stale creates device alert instead of normal glucose state",
+      "source_type": "vendor_api",
+      "connector_code": "vendor_api_framework",
+      "supported_metrics": ["continuous_glucose"],
+      "patient_context": {
+        "condition_profiles": ["diabetes"],
+        "active_monitoring": ["continuous_glucose"]
+      },
+      "device_status_events": [
+        {
+          "offset_seconds": 0,
+          "device_id": "dev_cgm_001",
+          "status": "disconnected",
+          "last_seen_at": "2026-05-06T17:35:00+05:30",
+          "metric_freshness": [
+            {
+              "metric_code": "continuous_glucose",
+              "freshness": "stale",
+              "last_observed_at": "2026-05-06T17:35:00+05:30",
+              "age_seconds": 3300
+            }
+          ]
+        }
+      ],
+      "observations": [],
+      "expected_risk_events": [
+        {
+          "rule_id": "device_disconnected_v1",
+          "severity": "high",
+          "reason_contains": "continuous glucose",
+          "should_not_escalate_as_emergency": true,
+          "recommended_policy_action": "prompt_patient_to_sync_device"
+        }
+      ]
+    },
+    {
+      "scenario_code": "ocr_spo2_low_needs_review_no_emergency",
+      "display_name": "Unreviewed OCR SpO2 low value is capped and cannot start emergency escalation",
+      "source_type": "ocr",
+      "connector_code": "ocr_reading",
+      "supported_metrics": ["spo2"],
+      "observations": [
+        {
+          "offset_seconds": 0,
+          "metric_code": "spo2",
+          "value_numeric": 88,
+          "unit": "%",
+          "observed_at": "2026-05-06T18:30:00+05:30",
+          "source_label": "OCR device-screen capture",
+          "reliability_tier": "manual_or_ocr",
+          "source_record_id": "ocr_spo2_001",
+          "review_status": "pending",
+          "raw_payload": {
+            "document_id": "doc_ocr_spo2_001",
+            "ocr_confidence": 0.63,
+            "source_image_region": "x120,y340,w210,h80"
+          },
+          "expected_quality": {
+            "freshness": "fresh",
+            "quality_score_max": 0.4,
+            "quality_flags": ["ocr_source", "review_required", "low_spo2_value"]
+          }
+        }
+      ],
+      "expected_risk_events": [
+        {
+          "rule_id": "spo2_low_v1",
+          "severity": "moderate",
+          "reason_contains": "review",
+          "requires_patient_confirmation": true,
+          "should_not_escalate_as_emergency": true,
+          "recommended_policy_action": "prompt_patient_repeat_reading"
         }
       ]
     }

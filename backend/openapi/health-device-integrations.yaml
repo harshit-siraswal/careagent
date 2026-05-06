@@ -7,6 +7,50 @@ servers:
   - url: https://api.careagent.local
     description: Placeholder API base URL
 paths:
+  /device-metrics:
+    get:
+      summary: List supported normalized metric definitions
+      operationId: listDeviceMetricDefinitions
+      responses:
+        "200":
+          description: Supported normalized metrics and freshness targets.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MetricDefinition"
+  /device-connectors:
+    get:
+      summary: List connector definitions available to clients
+      operationId: listDeviceConnectors
+      parameters:
+        - name: platform
+          in: query
+          schema:
+            type: string
+            enum: [ios, android, web]
+        - name: kind
+          in: query
+          schema:
+            $ref: "#/components/schemas/ConnectorKind"
+      responses:
+        "200":
+          description: Connector definitions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ConnectorDefinition"
   /device-catalog:
     get:
       summary: Search the global device catalog
@@ -29,7 +73,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [healthkit, health_connect, ble, vendor_api, fhir, manual, ocr]
+            enum: [healthkit, health_connect, ble, vendor_api, fhir, manual, ocr, simulator]
       responses:
         "200":
           description: Catalog search results.
@@ -142,6 +186,57 @@ paths:
       responses:
         "204":
           description: Connector account revoked.
+  /patients/{patient_id}/devices:
+    get:
+      summary: List patient registered devices and connection state
+      operationId: listPatientDevices
+      parameters:
+        - $ref: "#/components/parameters/PatientId"
+      responses:
+        "200":
+          description: Patient devices.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PatientDevice"
+    post:
+      summary: Register a patient device discovered through catalog, BLE, or fallback entry
+      operationId: registerPatientDevice
+      parameters:
+        - $ref: "#/components/parameters/PatientId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceRegistrationCreate"
+      responses:
+        "201":
+          description: Patient device registered.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientDevice"
+  /patients/{patient_id}/devices/{device_id}/status:
+    get:
+      summary: Get latest connection and metric freshness state for a patient device
+      operationId: getPatientDeviceStatus
+      parameters:
+        - $ref: "#/components/parameters/PatientId"
+        - $ref: "#/components/parameters/DeviceId"
+      responses:
+        "200":
+          description: Device status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceConnectionStatus"
   /patients/{patient_id}/observations:
     post:
       summary: Submit normalized or raw-backed observations
@@ -161,6 +256,27 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ObservationIngestionResponse"
+  /patients/{patient_id}/vitals/latest:
+    get:
+      summary: Get latest normalized vitals with source freshness and quality metadata
+      operationId: getLatestPatientVitals
+      parameters:
+        - $ref: "#/components/parameters/PatientId"
+        - name: metric_code
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: false
+      responses:
+        "200":
+          description: Latest vitals grouped by normalized metric.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LatestVitalsResponse"
   /patients/{patient_id}/simulator/runs:
     post:
       summary: Run a deterministic device simulator scenario
@@ -196,7 +312,94 @@ components:
       schema:
         type: string
         format: uuid
+    DeviceId:
+      name: device_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
   schemas:
+    ConnectorKind:
+      type: string
+      enum: [os_health_store, standard_ble, vendor_api, clinical_fhir, manual, ocr, simulator]
+    ConnectionMethod:
+      type: string
+      enum: [healthkit, health_connect, ble, vendor_api, fhir, manual, ocr, simulator]
+    MetricDefinition:
+      type: object
+      required: [metric_code, display_name, canonical_unit, accepted_units, freshness_target]
+      properties:
+        metric_code:
+          type: string
+        display_name:
+          type: string
+        canonical_unit:
+          type: string
+        accepted_units:
+          type: array
+          items:
+            type: string
+        freshness_target:
+          $ref: "#/components/schemas/FreshnessTarget"
+        plausible_range:
+          type: object
+          required: [min, max]
+          properties:
+            min:
+              type: number
+            max:
+              type: number
+        risk_eligible:
+          type: boolean
+          description: Whether this metric can be consumed by deterministic risk rules after quality gates.
+    FreshnessTarget:
+      type: object
+      required: [warning_after_seconds, stale_after_seconds]
+      properties:
+        warning_after_seconds:
+          type: integer
+          minimum: 0
+        stale_after_seconds:
+          type: integer
+          minimum: 0
+    ConnectorDefinition:
+      type: object
+      required: [connector_code, display_name, kind, auth_type, supported_metrics, supported_platforms, sync_mode, production_status]
+      properties:
+        connector_code:
+          type: string
+        display_name:
+          type: string
+        kind:
+          $ref: "#/components/schemas/ConnectorKind"
+        auth_type:
+          type: string
+          enum: [local_permission, oauth2, api_key, none]
+        supported_metrics:
+          type: array
+          items:
+            type: string
+        supported_platforms:
+          type: array
+          items:
+            type: string
+            enum: [ios, android, web, backend]
+        consent_scopes:
+          type: array
+          items:
+            type: string
+        sync_mode:
+          type: string
+          enum: [batch, incremental, webhook, streaming, manual_capture]
+        expected_latency:
+          type: string
+        production_status:
+          type: string
+          enum: [planned, prototype, pilot, production, disabled]
+        docs_url:
+          type: string
+          format: uri
     DeviceCatalogEntry:
       type: object
       required:
@@ -204,6 +407,7 @@ components:
         - brand
         - model
         - category
+        - support_tier
         - connection_methods
         - supported_metrics
         - validation_status
@@ -222,8 +426,7 @@ components:
         connection_methods:
           type: array
           items:
-            type: string
-            enum: [healthkit, health_connect, ble, vendor_api, fhir, manual, ocr]
+            $ref: "#/components/schemas/ConnectionMethod"
         supported_platforms:
           type: array
           items:
@@ -247,6 +450,20 @@ components:
           enum: [untested, community_tested, internally_tested, clinically_validated, deprecated]
         regulatory_notes:
           type: string
+        regional_availability:
+          type: array
+          items:
+            type: string
+            minLength: 2
+            maxLength: 2
+        risk_use_allowed:
+          type: boolean
+          default: false
+        risk_use_notes:
+          type: string
+        reviewed_at:
+          type: string
+          format: date-time
     CompatibilityCheckRequest:
       type: object
       required: [platform]
@@ -293,8 +510,10 @@ components:
           type: integer
           minimum: 1
         connection_method:
-          type: string
-          enum: [healthkit, health_connect, ble, vendor_api, fhir, manual, ocr, request_support]
+          oneOf:
+            - $ref: "#/components/schemas/ConnectionMethod"
+            - type: string
+              enum: [request_support]
         confidence:
           type: string
           enum: [high, medium, low, unknown]
@@ -351,7 +570,7 @@ components:
       properties:
         connector_code:
           type: string
-          enum: [healthkit, health_connect, ble_medical_profiles, vendor_api_framework, fhir_import, manual_entry, ocr_reading]
+          enum: [healthkit, health_connect, ble_medical_profiles, vendor_api_framework, fhir_import, manual_entry, ocr_reading, device_simulator]
         external_account_hash:
           type: string
         token_vault_ref:
@@ -359,6 +578,9 @@ components:
         permission_state:
           type: object
           additionalProperties: true
+        consent_grant_id:
+          type: string
+          format: uuid
     ConnectorAccount:
       allOf:
         - $ref: "#/components/schemas/ConnectorAccountCreate"
@@ -382,6 +604,105 @@ components:
             created_at:
               type: string
               format: date-time
+            sync_cursor:
+              type: string
+            revoked_at:
+              type: string
+              format: date-time
+    DeviceRegistrationCreate:
+      type: object
+      required: [display_name, connection_method, supported_metrics]
+      properties:
+        catalog_device_id:
+          type: string
+          format: uuid
+        connector_account_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        brand:
+          type: string
+        model:
+          type: string
+        category:
+          type: string
+        connection_method:
+          $ref: "#/components/schemas/ConnectionMethod"
+        supported_metrics:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        reliability_tier:
+          type: string
+          enum: [clinical, os_aggregator, standard_ble, vendor_api, manual_or_ocr, simulator, unknown]
+        risk_use_allowed:
+          type: boolean
+          default: false
+    PatientDevice:
+      allOf:
+        - $ref: "#/components/schemas/DeviceRegistrationCreate"
+        - type: object
+          required: [id, patient_id, status, active, created_at]
+          properties:
+            id:
+              type: string
+              format: uuid
+            patient_id:
+              type: string
+              format: uuid
+            status:
+              type: string
+              enum: [available, permission_required, active, limited, stale, disconnected, reauth_required, revoked, failed]
+            active:
+              type: boolean
+            connection_status:
+              $ref: "#/components/schemas/DeviceConnectionStatus"
+            created_at:
+              type: string
+              format: date-time
+    DeviceConnectionStatus:
+      type: object
+      required: [status, last_seen_at, metric_freshness]
+      properties:
+        status:
+          type: string
+          enum: [available, permission_required, active, limited, stale, disconnected, reauth_required, revoked, failed]
+        last_sync_at:
+          type: string
+          format: date-time
+        last_seen_at:
+          type: string
+          format: date-time
+        battery_level:
+          type: integer
+          minimum: 0
+          maximum: 100
+        signal_quality:
+          type: string
+          enum: [good, weak, unavailable, unknown]
+        error_code:
+          type: string
+        metric_freshness:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetricFreshnessStatus"
+    MetricFreshnessStatus:
+      type: object
+      required: [metric_code, freshness]
+      properties:
+        metric_code:
+          type: string
+        last_observed_at:
+          type: string
+          format: date-time
+        freshness:
+          type: string
+          enum: [fresh, delayed, stale, future_timestamp, unknown]
+        age_seconds:
+          type: integer
+          minimum: 0
     ObservationIngestionRequest:
       type: object
       required: [source_type, observations]
@@ -397,6 +718,10 @@ components:
         raw_payload:
           type: object
           additionalProperties: true
+        sync_cursor_before:
+          type: string
+        sync_cursor_after:
+          type: string
         observations:
           type: array
           minItems: 1
@@ -424,8 +749,15 @@ components:
           additionalProperties: true
         reliability_tier:
           type: string
-          enum: [clinical, os_aggregator, standard_ble, vendor_api, manual_or_ocr, unknown]
+          enum: [clinical, os_aggregator, standard_ble, vendor_api, manual_or_ocr, simulator, unknown]
         source_record_id:
+          type: string
+        timestamp_source:
+          type: string
+          enum: [device_reported_at, source_record_at, mobile_received_at, user_entered_at, document_effective_at, unknown]
+        dedupe_key:
+          type: string
+        group_id:
           type: string
         review_status:
           type: string
@@ -472,6 +804,9 @@ components:
         freshness:
           type: string
           enum: [fresh, delayed, stale, future_timestamp, unknown]
+        reliability_tier:
+          type: string
+          enum: [clinical, os_aggregator, standard_ble, vendor_api, manual_or_ocr, simulator, unknown]
         quality_score:
           type: number
           minimum: 0
@@ -480,6 +815,27 @@ components:
           type: array
           items:
             type: string
+        source_label:
+          type: string
+        source_record_id:
+          type: string
+        raw_payload_id:
+          type: string
+          format: uuid
+    LatestVitalsResponse:
+      type: object
+      required: [patient_id, readings]
+      properties:
+        patient_id:
+          type: string
+          format: uuid
+        generated_at:
+          type: string
+          format: date-time
+        readings:
+          type: array
+          items:
+            $ref: "#/components/schemas/ObservationResult"
     NormalizationError:
       type: object
       required: [error_code, error_message]
@@ -498,7 +854,7 @@ components:
           type: string
         mode:
           type: string
-          enum: [dry_run, ingest]
+          enum: [dry_run, ingest, replay]
           default: dry_run
         start_at:
           type: string

@@ -84,6 +84,30 @@ Idempotency rules:
 - Vendor API observations should use vendor sample ID plus account ID.
 - Manual and OCR observations should use user/document ID plus local capture ID.
 
+Connector runtime states:
+
+- `available`: connector can be configured on the current platform.
+- `permission_required`: connector exists but still needs patient permission.
+- `active`: connector has permission and a successful sync or live read.
+- `limited`: connector has partial permission, missing metrics, rate-limit pressure, or background restrictions.
+- `stale`: connector has not produced expected data within its metric freshness window.
+- `disconnected`: BLE/device account is not reachable and no recent sync is available.
+- `reauth_required`: OAuth or OS permission changed and the patient must reconnect.
+- `revoked`: patient revoked consent; sync and risk use must stop immediately.
+- `failed`: connector is unavailable due to persistent parse/API/device errors.
+
+Connector events published to the backend event bus:
+
+- `connector.account_created`
+- `connector.permission_changed`
+- `connector.sync_started`
+- `connector.sync_completed`
+- `connector.sync_failed`
+- `connector.reauth_required`
+- `connector.revoked`
+- `device.connection_state_changed`
+- `observation.normalization_failed`
+
 ## 3. OS Health Store Plans
 
 ### 3.1 Apple HealthKit
@@ -212,6 +236,54 @@ Compound metrics:
 - Pulse supplied inside blood pressure or pulse oximeter payloads can create a `heart_rate` observation with source detail `derived_from_same_measurement`.
 - Sleep stage records should attach stage detail in `fhir_json.component` or a future child-observation table.
 
+Normalized observation contract:
+
+```json
+{
+  "patient_id": "pat_123",
+  "metric_code": "spo2",
+  "value_numeric": 86,
+  "value_text": null,
+  "canonical_unit": "%",
+  "observed_at": "2026-05-06T18:31:30+05:30",
+  "ingested_at": "2026-05-06T18:31:35+05:30",
+  "timestamp_source": "device_reported_at",
+  "source_type": "ble",
+  "source_label": "BLE Pulse Oximeter",
+  "source_record_id": "ble_plx_002_spo2",
+  "device_id": "dev_ox_100",
+  "connector_account_id": "conn_ble_123",
+  "reliability_tier": "standard_ble",
+  "freshness": "fresh",
+  "quality_score": 0.9,
+  "quality_flags": ["critical_low_value"],
+  "raw_payload_id": "raw_456",
+  "dedupe_key": "dev_ox_100:plx:2a5e:2026-05-06T18:31:30+05:30",
+  "fhir_json": {
+    "resourceType": "Observation",
+    "status": "final",
+    "code": {
+      "text": "SpO2"
+    },
+    "valueQuantity": {
+      "value": 86,
+      "unit": "%"
+    }
+  }
+}
+```
+
+Normalizer rejection reasons:
+
+- `missing_required_source`: no source type, source label, source record ID, or device/app attribution where required.
+- `missing_timestamp`: no reliable observed timestamp.
+- `future_timestamp`: observed timestamp is more than 5 minutes ahead of ingestion time.
+- `unsupported_metric`: metric is not in the supported metric registry.
+- `unsupported_unit`: unit cannot be converted to the canonical unit.
+- `implausible_value`: value is outside device/profile plausible limits.
+- `malformed_raw_payload`: parser could not decode the raw record.
+- `duplicate_observation`: dedupe key already exists; suppress or link to original.
+
 ## 6. Device Catalog Schema
 
 The catalog is global reference data. Patient-owned devices still live in `devices`.
@@ -231,6 +303,9 @@ Required catalog fields:
 - validation status
 - regulatory notes
 - active/inactive status
+- regional availability
+- catalog owner and review timestamp
+- support evidence links: vendor docs, BLE certification notes, internal QA run, clinical-validation record if any
 
 Validation statuses:
 
@@ -254,6 +329,34 @@ The UI must phrase results as compatibility tiers, for example:
 - "Supported through Apple Health if this device syncs to Apple Health."
 - "Direct Bluetooth support for standard Blood Pressure profile is planned/tested."
 - "Manual/photo entry available. Automated sync is not confirmed for this model."
+
+Catalog example:
+
+```json
+{
+  "brand": "Example",
+  "model": "BLE BP 200",
+  "category": "blood_pressure_monitor",
+  "support_tier": "standard_ble",
+  "connection_methods": ["ble", "manual", "ocr"],
+  "supported_platforms": ["ios", "android"],
+  "supported_metrics": ["blood_pressure_systolic", "blood_pressure_diastolic", "heart_rate"],
+  "latency_expectation": "near_real_time_when_phone_is_nearby",
+  "freshness_targets": {
+    "blood_pressure_systolic": {
+      "warning_after_seconds": 1800,
+      "stale_after_seconds": 7200
+    }
+  },
+  "validation_status": "internally_tested",
+  "known_limitations": [
+    "Requires pairing before each household user switches profiles",
+    "Pulse value is optional in BLE payload"
+  ],
+  "risk_use_allowed": true,
+  "risk_use_notes": "Allowed for high/critical BP rules after safety review of parser and QA fixtures."
+}
+```
 
 ## 7. Vendor Connector Framework
 
@@ -342,6 +445,30 @@ Risk-engine use:
 - Stale readings can trigger stale-device alerts but should not be treated as live deterioration.
 - Risk evidence should include source, age, unit, value, and quality flags.
 
+Quality scoring algorithm:
+
+1. Start with the source-type base score.
+2. Reject observations missing metric, unit, observed timestamp, source type, or patient scope.
+3. Convert to canonical unit and reject unsupported conversions.
+4. Apply plausible-range checks before risk rules run.
+5. Calculate observed age from `ingested_at - observed_at` and assign freshness.
+6. Apply penalties for stale data, missing attribution, low battery, sensor status warnings, and unreviewed manual/OCR sources.
+7. Add corroboration flags when another source reports the same abnormal pattern inside the configured window.
+8. Persist both the final score and the explainable factors so risk events can cite them.
+
+Plausible input ranges for normalization, not clinical thresholds:
+
+| Metric code | Reject below | Reject above | Notes |
+| --- | ---: | ---: | --- |
+| `heart_rate` | 20 bpm | 240 bpm | Values outside this range require parser/manual review. |
+| `blood_pressure_systolic` | 50 mmHg | 280 mmHg | Must preserve cuff/status flags where available. |
+| `blood_pressure_diastolic` | 30 mmHg | 180 mmHg | Systolic must be greater than diastolic for grouped BP readings. |
+| `blood_glucose` | 20 mg/dL | 600 mg/dL | CGM sensor-status warnings lower quality. |
+| `spo2` | 50% | 100% | Signal quality or perfusion flags must be kept when available. |
+| `body_temperature` | 30 degC | 45 degC | Preserve body site/method if available. |
+| `respiratory_rate` | 4 breaths/min | 80 breaths/min | Vendor-derived values require source explanation. |
+| `weight` | 1 kg | 350 kg | Pediatric support needs separate review. |
+
 ## 9. API Surface
 
 Minimum endpoints owned by this workstream:
@@ -380,6 +507,21 @@ Simulator behavior:
 - Can freeze a scenario clock for deterministic tests.
 - Can mark itself as `source_type=simulator`.
 - Must be disabled in production unless an explicit demo/test environment flag is present.
+
+Scenario schema requirements:
+
+- `scenario_code`, `display_name`, `source_type`, `connector_code`, and `supported_metrics`.
+- Optional patient context: age band, known conditions, baseline values, and active thresholds.
+- Observation list with `offset_seconds`, metric, value, unit, observed timestamp, source label, reliability tier, source record ID, optional group ID, raw payload, and expected quality.
+- Expected risk events with severity, rule ID or reason substring, confirmation requirement, policy action, and whether escalation should be suppressed.
+- Expected non-events for false-negative regression tests, such as stale abnormal values that must not create critical alerts.
+- Malformed packet list with characteristic UUID, payload, and expected parser error.
+
+The simulator must support three modes:
+
+- `dry_run`: return generated observations and expected outcomes without persistence.
+- `ingest`: submit observations through the ingestion endpoint and emit normal events.
+- `replay`: run with deterministic offsets against a frozen scenario clock for risk-engine regression tests.
 
 ## 11. Edge Cases
 
