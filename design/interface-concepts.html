@@ -1,0 +1,893 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CareAgent Interface Concepts</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,650;9..144,760&family=Nunito+Sans:wght@500;650;750;850&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --canvas: #fffaf2;
+      --surface: #ffffff;
+      --surface-soft: #f7efe6;
+      --mint: #b8eadf;
+      --mint-deep: #52bca8;
+      --leaf: #1f8f7c;
+      --coral: #ef6f68;
+      --coral-deep: #bf3d47;
+      --amber: #f3c463;
+      --lavender: #d8c4ff;
+      --blue: #b7d7ff;
+      --ink: #2f2436;
+      --muted: #7d7181;
+      --line: #eadfd6;
+      --shadow: 0 24px 70px rgba(74, 51, 44, 0.14);
+      --tight-shadow: 0 12px 35px rgba(74, 51, 44, 0.11);
+      --radius-xl: 34px;
+      --radius-lg: 24px;
+      --radius-md: 18px;
+      --ease: cubic-bezier(.2,.8,.2,1);
+      --ease-soft: cubic-bezier(.34,1.56,.64,1);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      background: var(--canvas);
+      color: var(--ink);
+      font-family: "Nunito Sans", sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 10% 6%, rgba(184, 234, 223, .55), transparent 26%),
+        radial-gradient(circle at 90% 12%, rgba(216, 196, 255, .38), transparent 28%),
+        linear-gradient(135deg, #fffaf2 0%, #f7fff9 48%, #fff6ef 100%);
+    }
+
+    .stage {
+      width: min(1780px, 100%);
+      margin: 0 auto;
+      padding: 44px;
+    }
+
+    .titlebar {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 28px;
+      margin-bottom: 34px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--leaf);
+      font-weight: 850;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      font-size: 13px;
+    }
+
+    h1, h2, h3, p {
+      margin: 0;
+    }
+
+    h1 {
+      font-family: "Fraunces", serif;
+      font-size: 54px;
+      line-height: .95;
+      letter-spacing: 0;
+    }
+
+    .titlebar p {
+      color: var(--muted);
+      max-width: 520px;
+      line-height: 1.45;
+      font-size: 17px;
+      font-weight: 650;
+    }
+
+    .screen-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 320px);
+      gap: 26px;
+      align-items: start;
+    }
+
+    .phone {
+      width: 320px;
+      height: 690px;
+      background: linear-gradient(180deg, #fffefa 0%, #fff7ee 100%);
+      border: 7px solid #2f2436;
+      border-radius: 44px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      position: relative;
+    }
+
+    .phone::before {
+      content: "";
+      position: absolute;
+      z-index: 8;
+      top: 10px;
+      left: 50%;
+      width: 84px;
+      height: 22px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: #2f2436;
+    }
+
+    .phone-screen {
+      height: 100%;
+      padding: 40px 18px 18px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .screen-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .brand {
+      font-family: "Fraunces", serif;
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .clock {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 850;
+      padding: 8px 11px;
+      border-radius: 99px;
+      background: rgba(255,255,255,.72);
+      border: 1px solid var(--line);
+    }
+
+    .hero-status {
+      min-height: 158px;
+      position: relative;
+      border-radius: 30px;
+      padding: 20px 18px;
+      background:
+        radial-gradient(circle at 80% 20%, rgba(255,255,255,.88), transparent 24%),
+        linear-gradient(135deg, #d7f7ed 0%, #fef6df 100%);
+      box-shadow: var(--tight-shadow);
+      overflow: hidden;
+    }
+
+    .hero-status.urgent {
+      background:
+        radial-gradient(circle at 86% 20%, rgba(255,255,255,.82), transparent 26%),
+        linear-gradient(135deg, #ffe1d9 0%, #ffd1d1 52%, #fff3df 100%);
+    }
+
+    .status-label {
+      color: var(--leaf);
+      font-weight: 850;
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .urgent .status-label {
+      color: var(--coral-deep);
+    }
+
+    .status-title {
+      font-family: "Fraunces", serif;
+      font-size: 28px;
+      line-height: 1;
+      margin-top: 8px;
+      max-width: 180px;
+    }
+
+    .status-copy {
+      margin-top: 10px;
+      color: var(--muted);
+      line-height: 1.25;
+      font-size: 13px;
+      max-width: 165px;
+      font-weight: 650;
+    }
+
+    .mascot {
+      position: absolute;
+      right: 18px;
+      bottom: 18px;
+      width: 86px;
+      height: 96px;
+      filter: drop-shadow(0 14px 18px rgba(47,36,54,.16));
+      animation: caro-breathe 3.4s var(--ease) infinite;
+    }
+
+    .mascot.small {
+      position: relative;
+      right: auto;
+      bottom: auto;
+      width: 64px;
+      height: 72px;
+      flex: 0 0 auto;
+    }
+
+    .mascot-body {
+      position: absolute;
+      left: 9px;
+      bottom: 2px;
+      width: 68px;
+      height: 78px;
+      border-radius: 38px 38px 34px 34px;
+      background: linear-gradient(160deg, #ffffff 0%, #dffaf2 48%, #b8eadf 100%);
+      border: 3px solid rgba(47,36,54,.12);
+    }
+
+    .mascot-face {
+      position: absolute;
+      left: 22px;
+      top: 28px;
+      display: flex;
+      gap: 16px;
+    }
+
+    .eye {
+      width: 7px;
+      height: 11px;
+      border-radius: 999px;
+      background: var(--ink);
+      animation: caro-blink 5.2s ease-in-out infinite;
+    }
+
+    .smile {
+      position: absolute;
+      left: 34px;
+      top: 47px;
+      width: 18px;
+      height: 9px;
+      border-bottom: 3px solid var(--ink);
+      border-radius: 0 0 20px 20px;
+    }
+
+    .cheek {
+      position: absolute;
+      width: 10px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(239,111,104,.28);
+      top: 47px;
+    }
+
+    .cheek.left { left: 18px; }
+    .cheek.right { right: 18px; }
+
+    .leaf-ear {
+      position: absolute;
+      width: 28px;
+      height: 23px;
+      border-radius: 24px 24px 4px 24px;
+      background: #f3c463;
+      top: 10px;
+      left: 6px;
+      transform: rotate(-24deg);
+      transform-origin: bottom right;
+      animation: caro-ear 3.4s var(--ease-soft) infinite;
+    }
+
+    .pulse-ring {
+      position: absolute;
+      inset: -8px;
+      border-radius: 50%;
+      border: 2px solid rgba(82, 188, 168, .32);
+      animation: pulse-ring 2.6s ease-out infinite;
+    }
+
+    .urgent .mascot-body {
+      background: linear-gradient(160deg, #fff 0%, #ffe2dc 54%, #ffc7c5 100%);
+    }
+
+    .urgent .pulse-ring {
+      border-color: rgba(191,61,71,.35);
+      animation-duration: 1.3s;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .metric-strip {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .metric {
+      min-height: 92px;
+      border-radius: 24px;
+      background: rgba(255,255,255,.86);
+      border: 1px solid rgba(234,223,214,.8);
+      padding: 13px;
+      box-shadow: 0 8px 22px rgba(47,36,54,.06);
+    }
+
+    .metric b {
+      display: block;
+      font-size: 25px;
+      line-height: 1;
+      letter-spacing: 0;
+      margin-bottom: 6px;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.2;
+      font-weight: 750;
+    }
+
+    .section-title {
+      margin: 19px 0 10px;
+      font-size: 15px;
+      font-weight: 850;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 30px;
+      padding: 0 11px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+      white-space: nowrap;
+    }
+
+    .pill.green {
+      color: var(--leaf);
+      background: #e8fbf4;
+      border-color: #cdeee4;
+    }
+
+    .pill.red {
+      color: var(--coral-deep);
+      background: #fff1ee;
+      border-color: #ffd5ce;
+    }
+
+    .list {
+      display: grid;
+      gap: 9px;
+    }
+
+    .list-item {
+      border-radius: 22px;
+      background: rgba(255,255,255,.82);
+      border: 1px solid rgba(234,223,214,.9);
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 7px 20px rgba(47,36,54,.05);
+    }
+
+    .icon {
+      width: 38px;
+      height: 38px;
+      flex: 0 0 38px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: #e7faf4;
+      color: var(--leaf);
+      font-weight: 900;
+      font-size: 16px;
+    }
+
+    .icon.amber {
+      color: #9a6421;
+      background: #fff0c6;
+    }
+
+    .icon.red {
+      color: var(--coral-deep);
+      background: #fff0ed;
+    }
+
+    .item-main {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .item-main b {
+      display: block;
+      font-size: 14px;
+      line-height: 1.15;
+    }
+
+    .item-main span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.25;
+      font-weight: 650;
+    }
+
+    .nav {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: 16px;
+      height: 56px;
+      border-radius: 22px;
+      background: rgba(255,255,255,.82);
+      border: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      align-items: center;
+      box-shadow: 0 16px 30px rgba(47,36,54,.09);
+      backdrop-filter: blur(18px);
+    }
+
+    .nav span {
+      text-align: center;
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 850;
+    }
+
+    .nav span.active {
+      color: var(--leaf);
+    }
+
+    .device-arc {
+      height: 188px;
+      border-radius: 30px;
+      background:
+        radial-gradient(circle at 50% 56%, rgba(255,255,255,.95) 0 28%, transparent 29%),
+        conic-gradient(from 210deg, #b8eadf, #b7d7ff, #d8c4ff, #f3c463, #b8eadf);
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--tight-shadow);
+      margin-bottom: 16px;
+    }
+
+    .device-arc::after {
+      content: "82%";
+      position: absolute;
+      inset: 50% auto auto 50%;
+      transform: translate(-50%, -34%);
+      font-family: "Fraunces", serif;
+      font-size: 45px;
+    }
+
+    .device-arc .arc-label {
+      position: absolute;
+      left: 50%;
+      bottom: 42px;
+      transform: translateX(-50%);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+      white-space: nowrap;
+    }
+
+    .connect-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .connect-tile {
+      min-height: 96px;
+      border-radius: 24px;
+      padding: 13px;
+      background: rgba(255,255,255,.84);
+      border: 1px solid var(--line);
+    }
+
+    .connect-tile b {
+      display: block;
+      font-size: 13px;
+      line-height: 1.2;
+      margin-top: 16px;
+    }
+
+    .connect-tile span {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.2;
+      font-weight: 750;
+    }
+
+    .chat-rail {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .message {
+      max-width: 235px;
+      border-radius: 20px;
+      padding: 12px 13px;
+      font-size: 13px;
+      line-height: 1.28;
+      font-weight: 700;
+    }
+
+    .message.user {
+      justify-self: end;
+      background: var(--ink);
+      color: white;
+      border-bottom-right-radius: 7px;
+    }
+
+    .message.agent {
+      justify-self: start;
+      background: white;
+      border: 1px solid var(--line);
+      border-bottom-left-radius: 7px;
+    }
+
+    .upload-panel {
+      margin-top: 12px;
+      border-radius: 26px;
+      padding: 14px;
+      background: linear-gradient(135deg, #eafaf4, #fff9e8);
+      border: 1px solid #dceee6;
+    }
+
+    .source-chip {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--leaf);
+      font-weight: 850;
+    }
+
+    .action-stack {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .primary-action {
+      border: 0;
+      min-height: 48px;
+      border-radius: 18px;
+      color: white;
+      background: var(--coral-deep);
+      font-weight: 900;
+      font-size: 14px;
+      box-shadow: 0 15px 30px rgba(191,61,71,.22);
+    }
+
+    .secondary-action {
+      border: 1px solid var(--line);
+      min-height: 48px;
+      border-radius: 18px;
+      color: var(--ink);
+      background: white;
+      font-weight: 900;
+      font-size: 14px;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 9px;
+      margin-top: 14px;
+    }
+
+    .timeline-row {
+      display: grid;
+      grid-template-columns: 48px 1fr;
+      gap: 10px;
+      align-items: start;
+      font-size: 12px;
+    }
+
+    .timeline-row time {
+      color: var(--coral-deep);
+      font-weight: 900;
+    }
+
+    .timeline-row b {
+      display: block;
+      font-size: 13px;
+    }
+
+    .timeline-row span {
+      color: var(--muted);
+      line-height: 1.2;
+      font-weight: 650;
+    }
+
+    .patient-card {
+      border-radius: 24px;
+      padding: 13px;
+      background: rgba(255,255,255,.88);
+      border: 1px solid var(--line);
+      display: grid;
+      gap: 10px;
+    }
+
+    .patient-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 15px;
+      background: linear-gradient(135deg, var(--mint), var(--blue));
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+    }
+
+    .patient-name {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .patient-name b {
+      font-size: 14px;
+    }
+
+    .mini-vitals {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .mini-vitals span {
+      min-height: 44px;
+      border-radius: 15px;
+      background: #fff7ef;
+      padding: 7px 8px;
+      font-size: 11px;
+      line-height: 1.15;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .mini-vitals b {
+      display: block;
+      color: var(--ink);
+      font-size: 13px;
+    }
+
+    @keyframes caro-breathe {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-6px) scale(1.025); }
+    }
+
+    @keyframes caro-blink {
+      0%, 92%, 100% { transform: scaleY(1); }
+      95% { transform: scaleY(.12); }
+    }
+
+    @keyframes caro-ear {
+      0%, 100% { transform: rotate(-24deg); }
+      50% { transform: rotate(-12deg); }
+    }
+
+    @keyframes pulse-ring {
+      0% { opacity: .75; transform: scale(.72); }
+      100% { opacity: 0; transform: scale(1.18); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <header class="titlebar">
+      <div>
+        <p class="eyebrow">CareAgent visual direction</p>
+        <h1>Soft clinical companion</h1>
+      </div>
+      <p>Caro is present across high-risk and routine flows, using soft motion to signal listening, reminders, and escalation without making the app feel like a hospital dashboard.</p>
+    </header>
+
+    <section class="screen-grid" aria-label="CareAgent app interface concepts">
+      <article class="phone" id="screen-home">
+        <div class="phone-screen">
+          <div class="screen-header">
+            <div class="brand">CareAgent</div>
+            <div class="clock">9:41</div>
+          </div>
+
+          <section class="hero-status">
+            <p class="status-label">All clear</p>
+            <h2 class="status-title">Ravi is steady today.</h2>
+            <p class="status-copy">Last sync 4 min ago from Watch and BP monitor.</p>
+            <div class="mascot" aria-label="Caro mascot">
+              <div class="pulse-ring"></div>
+              <div class="leaf-ear"></div>
+              <div class="mascot-body">
+                <div class="mascot-face"><span class="eye"></span><span class="eye"></span></div>
+                <span class="cheek left"></span><span class="cheek right"></span><span class="smile"></span>
+              </div>
+            </div>
+          </section>
+
+          <div class="metric-strip">
+            <div class="metric"><b>78</b><span>Heart rate bpm<br>Watch, live</span></div>
+            <div class="metric"><b>118/76</b><span>Blood pressure<br>BP cuff, 9:32</span></div>
+            <div class="metric"><b>96%</b><span>SpO2<br>Ring, 9:36</span></div>
+            <div class="metric"><b>6.4</b><span>HbA1c<br>Lab report</span></div>
+          </div>
+
+          <div class="section-title">Next care action <span class="pill green">on time</span></div>
+          <div class="list">
+            <div class="list-item"><div class="icon amber">Rx</div><div class="item-main"><b>Metformin 500 mg</b><span>Speak reminder at 10:00 AM after breakfast.</span></div></div>
+            <div class="list-item"><div class="icon">AI</div><div class="item-main"><b>Ask Caro anything</b><span>Reports, devices, medicines, and caretaker updates.</span></div></div>
+          </div>
+          <nav class="nav"><span class="active">Home</span><span>Devices</span><span>Meds</span><span>SOS</span></nav>
+        </div>
+      </article>
+
+      <article class="phone" id="screen-devices">
+        <div class="phone-screen">
+          <div class="screen-header">
+            <div class="brand">Devices</div>
+            <div class="clock">9:43</div>
+          </div>
+          <div class="device-arc"><span class="arc-label">coverage from connected sources</span></div>
+          <div class="section-title">Connect health data <span class="pill green">5 tiers</span></div>
+          <div class="connect-grid">
+            <div class="connect-tile"><div class="icon">OS</div><b>Health stores</b><span>HealthKit and Health Connect</span></div>
+            <div class="connect-tile"><div class="icon">BT</div><b>BLE medical</b><span>BP, glucose, SpO2, heart</span></div>
+            <div class="connect-tile"><div class="icon">API</div><b>Vendor sync</b><span>Fitbit, Garmin, Oura, CGM</span></div>
+            <div class="connect-tile"><div class="icon amber">OCR</div><b>Photo fallback</b><span>For unsupported devices</span></div>
+          </div>
+          <div class="section-title">Connected now <span class="pill">fresh</span></div>
+          <div class="list">
+            <div class="list-item"><div class="icon">W</div><div class="item-main"><b>Smart watch</b><span>Heart rate every 2 min. Battery 64%.</span></div></div>
+            <div class="list-item"><div class="icon">BP</div><div class="item-main"><b>Omron BP monitor</b><span>Last reading 11 min ago.</span></div></div>
+          </div>
+          <nav class="nav"><span>Home</span><span class="active">Devices</span><span>Meds</span><span>SOS</span></nav>
+        </div>
+      </article>
+
+      <article class="phone" id="screen-chat">
+        <div class="phone-screen">
+          <div class="screen-header">
+            <div class="brand">Caro</div>
+            <div class="mascot small" aria-label="Caro mascot">
+              <div class="pulse-ring"></div>
+              <div class="leaf-ear"></div>
+              <div class="mascot-body">
+                <div class="mascot-face"><span class="eye"></span><span class="eye"></span></div>
+                <span class="cheek left"></span><span class="cheek right"></span><span class="smile"></span>
+              </div>
+            </div>
+          </div>
+          <div class="upload-panel">
+            <div class="row">
+              <div>
+                <p class="status-label">Document read</p>
+                <h2 class="status-title" style="font-size:24px;max-width:210px;">Prescription converted to schedule.</h2>
+              </div>
+              <span class="pill green">reviewed</span>
+            </div>
+          </div>
+          <div class="chat-rail">
+            <div class="message user">What do I take after breakfast?</div>
+            <div class="message agent">Metformin 500 mg, 1 tablet after breakfast. Source: prescription dated Apr 30.</div>
+            <div class="message user">Send today's update to my son.</div>
+            <div class="message agent">I can send a routine summary to Amit on WhatsApp after your confirmation.</div>
+          </div>
+          <div class="section-title">Ready actions <span class="pill">safe</span></div>
+          <div class="list">
+            <div class="list-item"><div class="icon">UP</div><div class="item-main"><b>Upload report</b><span>App, WhatsApp, or Telegram.</span></div></div>
+            <div class="list-item"><div class="icon amber">Rx</div><div class="item-main"><b>Confirm medicine</b><span>Review before reminders start.</span></div></div>
+          </div>
+          <nav class="nav"><span>Home</span><span>Devices</span><span class="active">Caro</span><span>SOS</span></nav>
+        </div>
+      </article>
+
+      <article class="phone" id="screen-urgent">
+        <div class="phone-screen">
+          <div class="screen-header">
+            <div class="brand">Alert</div>
+            <div class="clock">11:42</div>
+          </div>
+          <section class="hero-status urgent">
+            <p class="status-label">Critical</p>
+            <h2 class="status-title">Heart rate dropped fast.</h2>
+            <p class="status-copy">38 bpm from Watch BLE. Confidence 94%.</p>
+            <div class="mascot" aria-label="Caro mascot urgent">
+              <div class="pulse-ring"></div>
+              <div class="leaf-ear"></div>
+              <div class="mascot-body">
+                <div class="mascot-face"><span class="eye"></span><span class="eye"></span></div>
+                <span class="cheek left"></span><span class="cheek right"></span><span class="smile"></span>
+              </div>
+            </div>
+          </section>
+          <div class="timeline">
+            <div class="timeline-row"><time>11:42</time><div><b>Anomaly detected</b><span>72 to 38 bpm within 40 seconds.</span></div></div>
+            <div class="timeline-row"><time>11:42</time><div><b>Policy approved</b><span>Emergency consent active. Location allowed.</span></div></div>
+            <div class="timeline-row"><time>11:43</time><div><b>Calls started</b><span>Primary caretaker, doctor, ambulance contact.</span></div></div>
+          </div>
+          <div class="action-stack">
+            <button class="primary-action">Call primary caretaker</button>
+            <button class="secondary-action">Cancel false alarm</button>
+          </div>
+          <nav class="nav"><span>Home</span><span>Devices</span><span>Meds</span><span class="active">SOS</span></nav>
+        </div>
+      </article>
+
+      <article class="phone" id="screen-caretaker">
+        <div class="phone-screen">
+          <div class="screen-header">
+            <div class="brand">Care team</div>
+            <div class="clock">9:50</div>
+          </div>
+          <section class="hero-status">
+            <p class="status-label">4 patients</p>
+            <h2 class="status-title">One needs attention.</h2>
+            <p class="status-copy">Caro is watching device freshness and missed doses.</p>
+            <div class="mascot" aria-label="Caro mascot">
+              <div class="pulse-ring"></div>
+              <div class="leaf-ear"></div>
+              <div class="mascot-body">
+                <div class="mascot-face"><span class="eye"></span><span class="eye"></span></div>
+                <span class="cheek left"></span><span class="cheek right"></span><span class="smile"></span>
+              </div>
+            </div>
+          </section>
+          <div class="section-title">Patient roster <span class="pill red">1 alert</span></div>
+          <div class="list">
+            <div class="patient-card">
+              <div class="patient-top"><div class="patient-name"><div class="avatar">R</div><b>Ravi Sharma</b></div><span class="pill red">critical</span></div>
+              <div class="mini-vitals"><span><b>38</b>HR bpm</span><span><b>GPS</b>shared</span><span><b>call</b>active</span></div>
+            </div>
+            <div class="patient-card">
+              <div class="patient-top"><div class="patient-name"><div class="avatar">M</div><b>Meena Pal</b></div><span class="pill green">steady</span></div>
+              <div class="mini-vitals"><span><b>122/78</b>BP</span><span><b>96%</b>SpO2</span><span><b>fresh</b>watch</span></div>
+            </div>
+            <div class="patient-card">
+              <div class="patient-top"><div class="patient-name"><div class="avatar">A</div><b>Arun Dua</b></div><span class="pill">stale</span></div>
+              <div class="mini-vitals"><span><b>2h</b>no sync</span><span><b>due</b>meds</span><span><b>ask</b>Caro</span></div>
+            </div>
+          </div>
+          <nav class="nav"><span class="active">Roster</span><span>Alerts</span><span>Docs</span><span>Team</span></nav>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

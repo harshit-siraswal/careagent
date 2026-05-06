@@ -1,0 +1,1939 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CareAgent Apple Design Flow</title>
+  <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --surface: rgba(255, 255, 255, 0.78);
+      --surface-strong: rgba(255, 255, 255, 0.92);
+      --ink: #05070b;
+      --muted: #667080;
+      --line: rgba(35, 45, 60, 0.11);
+      --blue: #007aff;
+      --green: #34c759;
+      --red: #ff375f;
+      --purple: #af52de;
+      --teal: #30b7bd;
+      --orange: #ff8a1f;
+      --yellow: #ffd60a;
+      --shadow: 0 16px 42px rgba(24, 36, 52, 0.10);
+      --shadow-soft: 0 8px 24px rgba(24, 36, 52, 0.07);
+      --blur: blur(24px);
+      --control-height: 56px;
+      --control-radius: 999px;
+      --card-radius: 30px;
+      --row-radius: 26px;
+      --tile-radius: 28px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      color: var(--ink);
+      background: #eef3f8;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 15% 0%, rgba(255,255,255,.95), transparent 34%),
+        radial-gradient(circle at 86% 4%, rgba(212,232,255,.65), transparent 30%),
+        linear-gradient(180deg, #f9fbff 0%, #eef3f8 100%);
+    }
+
+    .board {
+      width: min(1640px, 100%);
+      padding: 34px 28px 60px;
+      margin: 0 auto;
+    }
+
+    .board-title {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 30px;
+      margin-bottom: 28px;
+    }
+
+    .board-title h1 {
+      margin: 8px 0 0;
+      font-size: 42px;
+      line-height: 1;
+      letter-spacing: -0.045em;
+      font-weight: 780;
+    }
+
+    .board-title p {
+      max-width: 620px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.35;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      height: 30px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.70);
+      color: #334155;
+      font-size: 13px;
+      font-weight: 600;
+      backdrop-filter: var(--blur);
+    }
+
+    .screens {
+      display: grid;
+      grid-template-columns: repeat(4, 386px);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .phone {
+      width: 386px;
+      height: 844px;
+      border: 9px solid #0f1319;
+      border-radius: 52px;
+      overflow: hidden;
+      background: #f7f9fc;
+      box-shadow: 0 28px 75px rgba(20, 32, 48, .18);
+      position: relative;
+    }
+
+    .phone::before {
+      content: "";
+      position: absolute;
+      z-index: 20;
+      top: 10px;
+      left: 50%;
+      width: 112px;
+      height: 28px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: #0f1319;
+    }
+
+    .screen {
+      height: 100%;
+      padding: 18px 18px 96px;
+      overflow: hidden;
+      position: relative;
+      background:
+        radial-gradient(circle at 14% 0%, rgba(255,255,255,.98), transparent 36%),
+        radial-gradient(circle at 88% 0%, rgba(220,236,255,.72), transparent 32%),
+        linear-gradient(180deg, #fbfcff 0%, #f4f7fb 100%);
+    }
+
+    .statusbar {
+      height: 28px;
+      margin: 0 10px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .system {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .bars {
+      display: flex;
+      align-items: flex-end;
+      height: 14px;
+      gap: 2px;
+    }
+
+    .bars i {
+      width: 4px;
+      border-radius: 2px;
+      background: #0f1319;
+    }
+
+    .bars i:nth-child(1) { height: 5px; }
+    .bars i:nth-child(2) { height: 8px; }
+    .bars i:nth-child(3) { height: 11px; }
+    .bars i:nth-child(4) { height: 14px; }
+
+    .wifi {
+      width: 18px;
+      height: 13px;
+      border: 3px solid #0f1319;
+      border-left-color: transparent;
+      border-right-color: transparent;
+      border-bottom: 0;
+      border-radius: 999px 999px 0 0;
+      position: relative;
+    }
+
+    .wifi::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      width: 6px;
+      height: 6px;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      background: #0f1319;
+    }
+
+    .battery {
+      width: 25px;
+      height: 13px;
+      border: 2px solid #0f1319;
+      border-radius: 4px;
+      position: relative;
+    }
+
+    .battery::before {
+      content: "";
+      position: absolute;
+      right: -5px;
+      top: 3px;
+      width: 3px;
+      height: 5px;
+      border-radius: 0 2px 2px 0;
+      background: #0f1319;
+    }
+
+    .battery::after {
+      content: "";
+      position: absolute;
+      inset: 2px 5px 2px 2px;
+      border-radius: 2px;
+      background: #0f1319;
+    }
+
+    .nav-title {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .nav-title h2 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.04;
+      letter-spacing: -0.038em;
+      font-weight: 760;
+    }
+
+    .nav-title p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.27;
+      letter-spacing: -0.012em;
+    }
+
+    .rounds {
+      display: flex;
+      gap: 10px;
+      flex: 0 0 auto;
+    }
+
+    .round {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.74);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: var(--blur);
+      display: grid;
+      place-items: center;
+      position: relative;
+    }
+
+    .round.notice::after {
+      content: "";
+      position: absolute;
+      top: 7px;
+      right: 7px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid white;
+      background: #ff3b30;
+    }
+
+    .round.bell::before,
+    .tab-icon.bell::before {
+      content: "";
+      width: 17px;
+      height: 16px;
+      border: 2px solid currentColor;
+      border-radius: 11px 11px 6px 6px;
+      border-bottom-width: 3px;
+      display: block;
+    }
+
+    .round.chat::before {
+      content: "";
+      width: 21px;
+      height: 17px;
+      border: 2px solid currentColor;
+      border-radius: 12px;
+      display: block;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--card-radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: var(--blur);
+    }
+
+    .ai-card {
+      padding: 16px;
+      display: grid;
+      grid-template-columns: 72px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      min-height: 106px;
+      margin-bottom: 17px;
+    }
+
+    .orb {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 50% 52%, #080d19 0 33%, #151d31 34% 45%, #a6b7ff 46% 100%);
+      box-shadow: 0 18px 36px rgba(91, 118, 255, .18), inset 0 0 22px rgba(255,255,255,.22);
+      position: relative;
+      animation: orb 3.8s ease-in-out infinite;
+    }
+
+    .orb.small {
+      width: 54px;
+      height: 54px;
+    }
+
+    .orb.alert {
+      background: radial-gradient(circle at 50% 52%, #170810 0 33%, #341521 34% 45%, #ffb3c0 46% 100%);
+      box-shadow: 0 18px 36px rgba(255,55,95,.18), inset 0 0 22px rgba(255,255,255,.22);
+    }
+
+    .orb::before, .orb::after {
+      content: "";
+      position: absolute;
+      top: 38%;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #64dcff;
+      box-shadow: 0 0 12px #64dcff;
+    }
+
+    .orb::before { left: 30%; }
+    .orb::after { right: 30%; }
+    .orb.alert::before, .orb.alert::after {
+      background: #ff7187;
+      box-shadow: 0 0 12px #ff7187;
+    }
+
+    .mascot {
+      display: block;
+      object-fit: contain;
+      filter: drop-shadow(0 15px 28px rgba(13, 63, 100, .16));
+    }
+
+    .mascot.hero {
+      width: 162px;
+      height: 162px;
+      margin: -8px auto 12px;
+    }
+
+    .mascot.avatar {
+      width: 72px;
+      height: 72px;
+      align-self: center;
+    }
+
+    .mascot.small {
+      width: 58px;
+      height: 58px;
+    }
+
+    .mascot.alert {
+      filter: drop-shadow(0 15px 28px rgba(255, 55, 95, .18)) saturate(1.15);
+    }
+
+    .ai-card h3,
+    .section h3,
+    .tile h4,
+    .insight h4,
+    .row-title {
+      margin: 0;
+      letter-spacing: -0.03em;
+    }
+
+    .ai-card h3 {
+      font-size: 19px;
+      line-height: 1.1;
+      font-weight: 700;
+    }
+
+    .ai-card p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.25;
+    }
+
+    .online {
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: #1fa846;
+      font-size: 14px;
+      font-weight: 620;
+    }
+
+    .online::before {
+      content: "";
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+
+    .inline-dot {
+      width: 9px;
+      height: 9px;
+      display: inline-block;
+      border-radius: 50%;
+      background: var(--green);
+      vertical-align: middle;
+      margin-left: 4px;
+    }
+
+    .agent-actions {
+      display: flex;
+      gap: 7px;
+    }
+
+    .agent-actions span {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.70);
+      border: 1px solid var(--line);
+      display: grid;
+      place-items: center;
+      color: var(--blue);
+      font-size: 12.5px;
+      font-weight: 680;
+    }
+
+    .section {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 2px 13px;
+    }
+
+    .section h3 {
+      font-size: 22px;
+      font-weight: 720;
+    }
+
+    .section a {
+      color: var(--blue);
+      text-decoration: none;
+      font-size: 17px;
+      font-weight: 560;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .tile {
+      min-height: 118px;
+      padding: 13px;
+      border-radius: var(--tile-radius);
+      position: relative;
+      overflow: hidden;
+      background: rgba(255,255,255,.78);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: var(--blur);
+    }
+
+    .tile.red { background: linear-gradient(135deg, rgba(255,255,255,.92), rgba(255,243,246,.72)); border-color: rgba(255,55,95,.18); }
+    .tile.blue { background: linear-gradient(135deg, rgba(255,255,255,.92), rgba(238,247,255,.72)); border-color: rgba(0,122,255,.16); }
+    .tile.purple { background: linear-gradient(135deg, rgba(255,255,255,.92), rgba(249,240,255,.72)); border-color: rgba(175,82,222,.16); }
+    .tile.green { background: linear-gradient(135deg, rgba(255,255,255,.92), rgba(240,255,246,.72)); border-color: rgba(52,199,89,.16); }
+    .tile.orange { background: linear-gradient(135deg, rgba(255,255,255,.92), rgba(255,247,238,.72)); border-color: rgba(255,138,31,.16); }
+    .tile.teal { background: linear-gradient(135deg, rgba(255,255,255,.92), rgba(238,253,254,.72)); border-color: rgba(48,183,189,.16); }
+
+    .tile-head {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 13px;
+    }
+
+    .badge {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: white;
+      font-size: 12px;
+      font-weight: 740;
+    }
+
+    .tile h4 {
+      font-size: 15px;
+      line-height: 1.08;
+      font-weight: 670;
+    }
+
+    .value {
+      display: flex;
+      align-items: baseline;
+      gap: 5px;
+      margin-bottom: 9px;
+    }
+
+    .value strong {
+      font-size: 30px;
+      line-height: .9;
+      letter-spacing: -0.045em;
+      font-weight: 740;
+    }
+
+    .value span {
+      font-size: 15px;
+      font-weight: 650;
+    }
+
+    .state {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .state::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .spark {
+      position: absolute;
+      right: -3px;
+      bottom: 22px;
+      width: 82px;
+      height: 42px;
+      opacity: .9;
+    }
+
+    .wide-card {
+      min-height: 78px;
+      padding: 14px 15px;
+      border-radius: var(--row-radius);
+      background: rgba(255,255,255,.80);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+      display: grid;
+      grid-template-columns: 46px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      backdrop-filter: var(--blur);
+    }
+
+    .circle {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: white;
+      font-size: 13px;
+      font-weight: 760;
+      background: var(--blue);
+    }
+
+    .wide-card b {
+      display: block;
+      font-size: 16px;
+      letter-spacing: -0.018em;
+    }
+
+    .wide-card span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.23;
+    }
+
+    .wide-card > .circle {
+      display: grid;
+      place-items: center;
+      margin-top: 0;
+      color: white;
+      line-height: 1;
+    }
+
+    .wide-card > .time-pill {
+      display: inline-flex;
+      margin-top: 0;
+      color: var(--blue);
+      white-space: nowrap;
+    }
+
+    .stack {
+      display: grid;
+      gap: 11px;
+      margin-bottom: 20px;
+    }
+
+    .device-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .device-card {
+      min-height: 108px;
+      padding: 10px 6px;
+      text-align: center;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.82);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .device-art {
+      width: 37px;
+      height: 40px;
+      border-radius: 10px;
+      margin: 0 auto 7px;
+      background: linear-gradient(145deg, #121923, #424d5d);
+    }
+
+    .device-art.bp { background: linear-gradient(145deg, #edf2f6, #9ba7b5); }
+    .device-art.gluco { background: linear-gradient(145deg, #d9e4f0, #657d99); }
+    .device-art.oxy { border-radius: 13px; background: linear-gradient(145deg, #132334, #42b0df); }
+
+    .device-card b {
+      display: block;
+      font-size: 13px;
+      line-height: 1.06;
+      letter-spacing: -0.02em;
+      margin-bottom: 5px;
+    }
+
+    .device-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.05;
+    }
+
+    .button-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .primary {
+      min-height: var(--control-height);
+      border: 0;
+      border-radius: var(--control-radius);
+      background: var(--blue);
+      color: white;
+      font-size: 17px;
+      font-weight: 680;
+      box-shadow: 0 12px 24px rgba(0,122,255,.20);
+    }
+
+    .secondary {
+      min-height: var(--control-height);
+      border: 0;
+      border-radius: var(--control-radius);
+      background: rgba(0,122,255,.10);
+      color: var(--blue);
+      font-size: 17px;
+      font-weight: 680;
+    }
+
+    .danger {
+      min-height: var(--control-height);
+      border: 0;
+      border-radius: var(--control-radius);
+      background: linear-gradient(180deg, #ff5363, #ed3547);
+      color: white;
+      font-size: 17px;
+      font-weight: 720;
+      box-shadow: 0 13px 26px rgba(255,55,95,.24);
+    }
+
+    .ghost {
+      min-height: var(--control-height);
+      border-radius: var(--control-radius);
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.82);
+      color: var(--ink);
+      font-size: 17px;
+      font-weight: 680;
+    }
+
+    .bubble-list {
+      display: grid;
+      gap: 11px;
+      margin-bottom: 18px;
+    }
+
+    .bubble {
+      max-width: 300px;
+      padding: 13px 15px;
+      border-radius: 20px;
+      font-size: 15.5px;
+      line-height: 1.31;
+      letter-spacing: -0.008em;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .bubble.user {
+      justify-self: end;
+      color: white;
+      background: var(--blue);
+      border-bottom-right-radius: 7px;
+    }
+
+    .bubble.agent {
+      justify-self: start;
+      background: rgba(255,255,255,.86);
+      border: 1px solid var(--line);
+      border-bottom-left-radius: 7px;
+    }
+
+    .source {
+      display: block;
+      margin-top: 8px;
+      color: var(--blue);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .schedule {
+      display: grid;
+      gap: 11px;
+    }
+
+    .medicine {
+      min-height: 92px;
+      padding: 15px;
+      border-radius: var(--row-radius);
+      background: rgba(255,255,255,.82);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+      display: grid;
+      grid-template-columns: 48px 1fr;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .medicine b {
+      display: block;
+      font-size: 16px;
+      line-height: 1.12;
+      letter-spacing: -0.018em;
+    }
+
+    .medicine span:not(.circle):not(.time-pill) {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13.5px;
+      line-height: 1.18;
+    }
+
+    .time-pill {
+      height: 30px;
+      padding: 0 10px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      background: rgba(0,122,255,.10);
+      color: var(--blue);
+      font-size: 13px;
+      font-weight: 660;
+    }
+
+    .status-matrix {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 17px;
+    }
+
+    .status-block {
+      min-height: 86px;
+      padding: 14px;
+      border-radius: 24px;
+      background: rgba(255,255,255,.82);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .status-block strong {
+      display: block;
+      font-size: 24px;
+      line-height: .95;
+      letter-spacing: -0.045em;
+    }
+
+    .status-block span {
+      display: block;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.15;
+    }
+
+    .permission-list {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 17px;
+    }
+
+    .permission-row {
+      min-height: 76px;
+      padding: 14px 15px;
+      border-radius: var(--row-radius);
+      background: rgba(255,255,255,.84);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+      display: grid;
+      grid-template-columns: 1fr 52px;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .permission-row b {
+      display: block;
+      font-size: 15px;
+      letter-spacing: -0.02em;
+    }
+
+    .permission-row span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.18;
+    }
+
+    .switch {
+      width: 50px;
+      height: 30px;
+      border-radius: 999px;
+      background: #cfd6df;
+      position: relative;
+    }
+
+    .switch::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: white;
+      box-shadow: 0 2px 8px rgba(0,0,0,.18);
+    }
+
+    .switch.on {
+      background: var(--green);
+    }
+
+    .switch.on::after {
+      left: 23px;
+    }
+
+    .contact-card {
+      min-height: 86px;
+      padding: 15px;
+      border-radius: var(--row-radius);
+      background: rgba(255,255,255,.84);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+      display: grid;
+      grid-template-columns: 46px 1fr auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .contact-card b {
+      display: block;
+      font-size: 16px;
+      letter-spacing: -0.025em;
+    }
+
+    .contact-card span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.18;
+    }
+
+    .contact-card > .circle {
+      display: grid;
+      place-items: center;
+      margin-top: 0;
+      color: white;
+      line-height: 1;
+    }
+
+    .contact-action {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: var(--blue);
+      background: rgba(0,122,255,.10);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .contact-card > .contact-action {
+      display: grid;
+      margin-top: 0;
+      color: var(--blue);
+      line-height: 1;
+    }
+
+    .policy-card {
+      padding: 17px;
+      border-radius: var(--card-radius);
+      background: rgba(255,255,255,.86);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+      margin-bottom: 15px;
+    }
+
+    .policy-card h3 {
+      margin: 0;
+      font-size: 21px;
+      letter-spacing: -0.035em;
+    }
+
+    .policy-card p {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.25;
+    }
+
+    .risk-scale {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-top: 13px;
+    }
+
+    .risk-scale span {
+      min-height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      color: white;
+      font-size: 12px;
+      font-weight: 740;
+    }
+
+    .call-script {
+      padding: 15px;
+      border-radius: var(--row-radius);
+      background: rgba(255,255,255,.84);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+      color: #1f2937;
+      font-size: 14px;
+      line-height: 1.28;
+      margin-bottom: 15px;
+    }
+
+    .flow-card {
+      padding: 18px;
+      border-radius: var(--card-radius);
+      background: rgba(255,255,255,.84);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+      margin-bottom: 16px;
+    }
+
+    .flow-card h3 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.08;
+      letter-spacing: -0.032em;
+    }
+
+    .flow-card p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.34;
+    }
+
+    .flow-card .orb {
+      margin-bottom: 14px;
+    }
+
+    .flow-card.tight {
+      padding: 14px 16px;
+    }
+
+    .flow-card.tight h3 {
+      font-size: 18px;
+    }
+
+    .step-progress {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      margin-bottom: 17px;
+    }
+
+    .step-progress span {
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(30,41,59,.13);
+    }
+
+    .step-progress span.done {
+      background: var(--blue);
+    }
+
+    .form-card {
+      padding: 6px 15px;
+      border-radius: var(--card-radius);
+      background: rgba(255,255,255,.84);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+      margin-bottom: 16px;
+    }
+
+    .form-row {
+      min-height: 62px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid rgba(35,45,60,.08);
+    }
+
+    .form-row:last-child {
+      border-bottom: 0;
+    }
+
+    .form-row b {
+      display: block;
+      font-size: 15px;
+      letter-spacing: -0.02em;
+    }
+
+    .form-row span {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.15;
+      text-align: right;
+    }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 20px;
+      background: rgba(120,132,150,.14);
+      margin-bottom: 16px;
+    }
+
+    .segmented span {
+      height: 40px;
+      border-radius: 17px;
+      display: grid;
+      place-items: center;
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    .segmented .active {
+      color: var(--ink);
+      background: rgba(255,255,255,.94);
+      box-shadow: 0 4px 12px rgba(20, 32, 48, .10);
+    }
+
+    .search-card {
+      min-height: 54px;
+      padding: 0 15px;
+      border-radius: 20px;
+      background: rgba(255,255,255,.86);
+      border: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 15px;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .search-card::before {
+      content: "";
+      width: 16px;
+      height: 16px;
+      border: 2px solid currentColor;
+      border-radius: 50%;
+      box-shadow: 9px 9px 0 -7px currentColor;
+      transform: rotate(-15deg);
+    }
+
+    .catalog-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .catalog-item {
+      min-height: 112px;
+      padding: 13px;
+      border-radius: var(--row-radius);
+      background: rgba(255,255,255,.82);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .catalog-item b {
+      display: block;
+      margin-top: 12px;
+      font-size: 15px;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+    }
+
+    .catalog-item span {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.15;
+    }
+
+    .catalog-item > .circle {
+      display: grid;
+      place-items: center;
+      margin-top: 0;
+      color: white;
+      line-height: 1;
+    }
+
+    .catalog-grid.compact .catalog-item {
+      min-height: 84px;
+      padding: 12px;
+    }
+
+    .catalog-grid.compact .catalog-item b {
+      margin-top: 9px;
+    }
+
+    .fact-card {
+      padding: 14px;
+      border-radius: var(--row-radius);
+      background: rgba(255,255,255,.84);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+      margin-bottom: 11px;
+    }
+
+    .fact-card b {
+      display: block;
+      font-size: 16px;
+      letter-spacing: -0.025em;
+    }
+
+    .fact-card span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .fact-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 7px;
+      margin-top: 12px;
+    }
+
+    .fact-actions button {
+      min-height: 38px;
+      border: 0;
+      border-radius: var(--control-radius);
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--blue);
+      background: rgba(0,122,255,.10);
+    }
+
+    .alert-card {
+      padding: 14px;
+      border-radius: var(--row-radius);
+      background: rgba(255,255,255,.84);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+      margin-bottom: 11px;
+    }
+
+    .alert-card.critical {
+      border-color: rgba(255,55,95,.22);
+      background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,241,244,.84));
+    }
+
+    .alert-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .alert-top b {
+      display: block;
+      font-size: 16px;
+      letter-spacing: -0.025em;
+    }
+
+    .alert-top span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .evidence {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+    }
+
+    .evidence span {
+      min-height: 45px;
+      padding: 8px;
+      border-radius: 14px;
+      background: rgba(239,243,247,.86);
+      color: var(--muted);
+      font-size: 11.5px;
+      line-height: 1.1;
+    }
+
+    .evidence b {
+      display: block;
+      color: var(--ink);
+      font-size: 14px;
+      margin-bottom: 2px;
+    }
+
+    .call-screen {
+      padding: 20px;
+      border-radius: 34px;
+      background: linear-gradient(180deg, rgba(20,27,39,.96), rgba(40,54,76,.92));
+      color: white;
+      box-shadow: 0 18px 42px rgba(8,14,24,.24);
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .call-screen .orb {
+      margin: 4px auto 16px;
+    }
+
+    .call-screen h3 {
+      margin: 0;
+      font-size: 25px;
+      letter-spacing: -0.04em;
+    }
+
+    .call-screen p {
+      margin: 9px auto 0;
+      max-width: 270px;
+      color: rgba(255,255,255,.72);
+      font-size: 14px;
+      line-height: 1.3;
+    }
+
+    .call-options {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 9px;
+      margin-top: 16px;
+    }
+
+    .call-options span {
+      min-height: 54px;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
+      background: rgba(255,255,255,.12);
+      color: rgba(255,255,255,.88);
+      font-size: 11.5px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .message-card {
+      padding: 13px;
+      border-radius: var(--row-radius);
+      background: rgba(255,255,255,.86);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+      margin-bottom: 10px;
+    }
+
+    .message-card b {
+      display: block;
+      font-size: 15px;
+      letter-spacing: -0.02em;
+    }
+
+    .message-card span {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.22;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 11px;
+      margin-bottom: 18px;
+    }
+
+    .timeline-row {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 10px;
+    }
+
+    .timeline-row time {
+      color: var(--red);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .timeline-row b {
+      display: block;
+      font-size: 15px;
+      letter-spacing: -0.015em;
+    }
+
+    .timeline-row span {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .patient-card {
+      padding: 14px;
+      border-radius: 22px;
+      background: rgba(255,255,255,.84);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .patient-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 11px;
+    }
+
+    .person {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+    }
+
+    .avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, #e7f9e1, #c7f2bb);
+      color: #1a9d35;
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+      font-weight: 740;
+    }
+
+    .person b {
+      display: block;
+      font-size: 16px;
+      letter-spacing: -0.025em;
+    }
+
+    .person span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 2px;
+    }
+
+    .status-pill {
+      min-width: 64px;
+      height: 29px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      padding: 0 10px;
+      background: rgba(52,199,89,.12);
+      color: #1fa846;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .status-pill.red {
+      color: var(--red);
+      background: rgba(255,55,95,.10);
+    }
+
+    .mini-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .mini-stats span {
+      min-height: 44px;
+      border-radius: 15px;
+      background: rgba(239,243,247,.86);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.1;
+      padding: 8px;
+    }
+
+    .mini-stats b {
+      display: block;
+      color: var(--ink);
+      font-size: 14px;
+      margin-bottom: 2px;
+    }
+
+    .tabbar {
+      position: absolute;
+      left: 9px;
+      right: 9px;
+      bottom: 9px;
+      height: 82px;
+      border-radius: 28px 28px 34px 34px;
+      background: rgba(255,255,255,.88);
+      border: 1px solid var(--line);
+      box-shadow: 0 -10px 42px rgba(20,28,38,.11);
+      backdrop-filter: var(--blur);
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      align-items: center;
+      padding-bottom: 12px;
+    }
+
+    .tab {
+      display: grid;
+      place-items: center;
+      gap: 4px;
+      color: #4e5765;
+      font-size: 10.5px;
+      font-weight: 520;
+    }
+
+    .tab.active { color: var(--blue); }
+
+    .tab-icon {
+      width: 24px;
+      height: 24px;
+      display: block;
+      position: relative;
+      color: currentColor;
+    }
+
+    .tab-icon::before, .tab-icon::after {
+      content: "";
+      position: absolute;
+      display: block;
+    }
+
+    .tab-icon.heart::before {
+      width: 15px;
+      height: 15px;
+      left: 4px;
+      top: 4px;
+      border: 2px solid currentColor;
+      border-top: 0;
+      border-left: 0;
+      transform: rotate(45deg);
+      border-radius: 0 0 5px 0;
+    }
+
+    .tab-icon.device::before {
+      width: 12px;
+      height: 18px;
+      left: 3px;
+      top: 3px;
+      border: 2px solid currentColor;
+      border-radius: 4px;
+    }
+
+    .tab-icon.device::after {
+      width: 8px;
+      height: 13px;
+      right: 2px;
+      top: 8px;
+      border: 2px solid currentColor;
+      border-radius: 4px;
+    }
+
+    .tab-icon.bell::before {
+      position: absolute;
+      left: 4px;
+      top: 4px;
+    }
+
+    .tab-icon.user::before {
+      width: 9px;
+      height: 9px;
+      left: 8px;
+      top: 3px;
+      border: 2px solid currentColor;
+      border-radius: 50%;
+    }
+
+    .tab-icon.user::after {
+      width: 18px;
+      height: 10px;
+      left: 3px;
+      bottom: 3px;
+      border: 2px solid currentColor;
+      border-radius: 12px 12px 5px 5px;
+    }
+
+    .plus {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, #4aa2ff, #0877f2);
+      box-shadow: 0 13px 24px rgba(0,122,255,.28);
+      margin-top: -22px;
+      position: relative;
+    }
+
+    .plus::before, .plus::after {
+      content: "";
+      position: absolute;
+      left: 16px;
+      top: 26px;
+      width: 24px;
+      height: 3px;
+      border-radius: 999px;
+      background: white;
+    }
+
+    .plus::after { transform: rotate(90deg); }
+
+    .home-indicator {
+      position: absolute;
+      bottom: 7px;
+      left: 50%;
+      width: 128px;
+      height: 5px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: #0f1319;
+      z-index: 30;
+    }
+
+    @keyframes orb {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.035); }
+    }
+
+    body:has(.phone:target) .board {
+      width: max-content;
+      padding: 20px;
+    }
+
+    body:has(.phone:target) .board-title {
+      display: none;
+    }
+
+    body:has(.phone:target) .screens {
+      display: block;
+    }
+
+    body:has(.phone:target) .phone {
+      display: none;
+    }
+
+    body:has(.phone:target) .phone:target {
+      display: block;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <header class="board-title">
+      <div>
+        <span class="chip">CareAgent Apple flow v5</span>
+        <h1>AI Health Guardian</h1>
+      </div>
+      <p>PRD/TRD-driven journey map: patient setup, live monitoring, device quality, medicine adherence, document review, agent channels, risk check-ins, emergency escalation, and caretaker operations.</p>
+    </header>
+
+    <section class="screens">
+      <article class="phone" id="flow-welcome">
+        <div class="screen">
+          <div class="statusbar"><span>9:38</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <div class="step-progress"><span class="done"></span><span></span><span></span><span></span><span></span></div>
+          <section class="flow-card" style="padding:18px;"><img class="mascot hero" src="assets/caro-mascot.svg" alt="Caro health guardian mascot"><h3>Set up your AI Health Guardian</h3><p>Caro helps monitor readings, remind medicines, answer from reviewed records, and reach your care team when risk rules require it.</p></section>
+          <div class="stack"><div class="wide-card"><span class="circle" style="background:var(--blue)">1</span><div><b>Health data stays controlled</b><span>You choose devices, channels, caretakers, calls, and location sharing.</span></div></div><div class="wide-card"><span class="circle" style="background:var(--green)">2</span><div><b>AI actions are disclosed</b><span>Messages and calls say CareAgent is an AI assistant with authorization.</span></div></div><div class="wide-card"><span class="circle" style="background:var(--orange)">3</span><div><b>Emergency automation is off first</b><span>It becomes active only after contacts, consent, and policy are configured.</span></div></div></div>
+          <button class="primary" style="width:100%;margin-top:8px;">Continue Setup</button>
+          <div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-profile-setup">
+        <div class="screen">
+          <div class="statusbar"><span>9:39</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <div class="step-progress"><span class="done"></span><span class="done"></span><span></span><span></span><span></span></div>
+          <header class="nav-title"><div><h2>Health Profile</h2><p>Risk rules use age, conditions, allergies, baseline, and preferred language.</p></div></header>
+          <section class="form-card"><div class="form-row"><b>Name</b><span>Ramesh Sharma</span></div><div class="form-row"><b>Age</b><span>68 years</span></div><div class="form-row"><b>Conditions</b><span>Diabetes, BP</span></div><div class="form-row"><b>Allergies</b><span>Penicillin</span></div><div class="form-row"><b>Language</b><span>Hindi + English</span></div></section>
+          <div class="section"><h3>Care Priorities</h3><a href="#">Edit</a></div>
+          <div class="status-matrix"><div class="status-block"><strong>Heart</strong><span>Higher priority for rapid HR changes.</span></div><div class="status-block"><strong>Glucose</strong><span>Track fasting and post-meal values.</span></div><div class="status-block"><strong>BP</strong><span>Daily morning check preferred.</span></div><div class="status-block"><strong>Meds</strong><span>Family notified on missed doses.</span></div></div>
+          <button class="primary" style="width:100%;">Save Profile</button>
+          <div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-onboarding-consent">
+        <div class="screen">
+          <div class="statusbar"><span>9:40</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <div class="step-progress"><span class="done"></span><span class="done"></span><span class="done"></span><span></span><span></span></div>
+          <header class="nav-title"><div><h2>Consent Setup</h2><p>Turn on only the permissions needed for the features you want.</p></div><img class="mascot small" src="assets/caro-mascot.svg" alt="Caro"></header>
+          <div class="permission-list"><div class="permission-row"><div><b>Read health data</b><span>HealthKit, Health Connect, approved BLE, and vendor sync.</span></div><span class="switch on"></span></div><div class="permission-row"><div><b>Analyze reports</b><span>OCR and extraction with review before reminders.</span></div><span class="switch on"></span></div><div class="permission-row"><div><b>Care team access</b><span>Family and nurses see only patients assigned to them.</span></div><span class="switch on"></span></div><div class="permission-row"><div><b>Emergency automation</b><span>Enable after verified contacts and escalation test.</span></div><span class="switch"></span></div></div>
+          <section class="flow-card"><h3>Why separate consent?</h3><p>A patient can allow medicine reminders without allowing location sharing or automatic calls. Revocation is available anytime.</p></section>
+          <button class="primary" style="width:100%;">Review Care Team</button>
+          <div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-device-catalog">
+        <div class="screen">
+          <div class="statusbar"><span>9:40</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <div class="step-progress"><span class="done"></span><span class="done"></span><span class="done"></span><span class="done"></span><span></span></div>
+          <header class="nav-title"><div><h2>Find Device</h2><p>Connect smart watches, fitness bands, and many medical devices.</p></div></header>
+          <div class="search-card">Search brand, model, or metric</div>
+          <div class="catalog-grid"><div class="catalog-item"><span class="circle" style="background:var(--blue)">OS</span><b>Phone health store</b><span>Apple Health or Health Connect.</span></div><div class="catalog-item"><span class="circle" style="background:var(--green)">BLE</span><b>Nearby medical device</b><span>BP, glucose, SpO2, ECG, thermometer.</span></div><div class="catalog-item"><span class="circle" style="background:var(--purple)">API</span><b>Vendor account</b><span>Fitbit, Garmin, Oura, Dexcom, Omron.</span></div><div class="catalog-item"><span class="circle" style="background:var(--orange)">OCR</span><b>Photo/manual</b><span>Unsupported devices still have a fallback.</span></div></div>
+          <div class="wide-card"><span class="circle" style="background:var(--red)">!</span><div><b>Use for emergency escalation</b><span>Choose which sources are reliable enough for critical protocols.</span></div></div>
+          <button class="primary" style="width:100%;margin-top:13px;">Continue</button>
+          <div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-dashboard">
+        <div class="screen">
+          <div class="statusbar"><span>9:41</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Good Morning,<br>Ramesh</h2><p>Your AI Health Guardian is active <span class="inline-dot"></span></p></div><div class="rounds"><div class="round bell notice"></div><div class="round chat"></div></div></header>
+          <section class="card ai-card"><img class="mascot avatar" src="assets/caro-mascot.svg" alt="Caro"><div><h3>Health Guardian AI</h3><p>OpenClaw based Agent</p><div class="online">Online</div></div><div class="agent-actions"><span>Call</span><span>WA</span><span>TG</span></div></section>
+          <div class="section"><h3>Health Overview</h3><a href="#">See All</a></div>
+          <div class="metric-grid">
+            <div class="tile red"><div class="tile-head"><span class="badge" style="background:var(--red)">HR</span><h4>Heart Rate</h4></div><div class="value"><strong>72</strong><span style="color:var(--red)">BPM</span></div><div class="state" style="color:var(--red)">Normal</div><svg class="spark" viewBox="0 0 100 44"><path d="M0 28 L8 23 L16 26 L23 19 L31 31 L38 27 L45 34 L53 20 L61 25 L68 23 L76 10 L84 35 L92 20 L100 26" fill="none" stroke="#ff375f" stroke-width="3" stroke-linecap="round"/></svg></div>
+            <div class="tile blue"><div class="tile-head"><span class="badge" style="background:var(--blue)">BP</span><h4>Blood Pressure</h4></div><div class="value"><strong>118/76</strong><span style="color:var(--blue)">mmHg</span></div><div class="state" style="color:var(--blue)">Normal</div><svg class="spark" viewBox="0 0 100 44"><path d="M0 31 L9 28 L17 24 L25 27 L33 19 L41 32 L49 22 L58 26 L66 21 L74 31 L82 8 L91 33 L100 24" fill="none" stroke="#007aff" stroke-width="3" stroke-linecap="round"/></svg></div>
+            <div class="tile purple"><div class="tile-head"><span class="badge" style="background:var(--purple)">O2</span><h4>SpO2</h4></div><div class="value"><strong>98</strong><span style="color:var(--purple)">%</span></div><div class="state" style="color:var(--purple)">Normal</div></div>
+            <div class="tile green"><div class="tile-head"><span class="badge" style="background:var(--green)">T</span><h4>Temperature</h4></div><div class="value"><strong>36.6</strong><span style="color:var(--green)">C</span></div><div class="state" style="color:var(--green)">Normal</div></div>
+          </div>
+          <nav class="tabbar"><div class="tab active"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab"><span class="tab-icon device"></span><span>Devices</span></div><div class="tab"><span class="plus"></span></div><div class="tab"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-vitals">
+        <div class="screen">
+          <div class="statusbar"><span>9:42</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Vitals</h2><p>Live readings with source and freshness.</p></div><div class="round bell"></div></header>
+          <section class="tile red" style="min-height:170px;margin-bottom:13px;"><div class="tile-head"><span class="badge" style="background:var(--red)">HR</span><h4>Heart Rate</h4></div><div class="value"><strong style="font-size:44px">72</strong><span style="color:var(--red)">BPM</span></div><div class="state" style="color:var(--red)">Apple Watch, live</div><svg class="spark" style="width:150px;height:64px;right:12px;" viewBox="0 0 150 60"><path d="M0 38 L12 30 L23 34 L34 23 L47 43 L58 36 L69 44 L81 24 L94 31 L105 28 L116 8 L128 50 L139 27 L150 35" fill="none" stroke="#ff375f" stroke-width="4" stroke-linecap="round"/></svg></section>
+          <div class="metric-grid">
+            <div class="tile blue"><div class="tile-head"><span class="badge" style="background:var(--blue)">BP</span><h4>Blood Pressure</h4></div><div class="value"><strong>118/76</strong></div><div class="state" style="color:var(--blue)">BP cuff 9:32</div></div>
+            <div class="tile purple"><div class="tile-head"><span class="badge" style="background:var(--purple)">O2</span><h4>SpO2</h4></div><div class="value"><strong>98</strong><span style="color:var(--purple)">%</span></div><div class="state" style="color:var(--purple)">Pulse Ox 9:38</div></div>
+            <div class="tile teal"><div class="tile-head"><span class="badge" style="background:var(--teal)">ECG</span><h4>ECG</h4></div><div class="value"><strong style="font-size:24px">Normal</strong></div><div class="state" style="color:var(--teal)">Sinus rhythm</div></div>
+            <div class="tile orange"><div class="tile-head"><span class="badge" style="background:var(--orange)">RR</span><h4>Respiratory</h4></div><div class="value"><strong>16</strong><span style="color:var(--orange)">brpm</span></div><div class="state" style="color:var(--orange)">Normal</div></div>
+          </div>
+          <nav class="tabbar"><div class="tab active"><span class="tab-icon heart"></span><span>Vitals</span></div><div class="tab"><span class="tab-icon device"></span><span>Devices</span></div><div class="tab"><span class="plus"></span></div><div class="tab"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-devices">
+        <div class="screen">
+          <div class="statusbar"><span>9:43</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Devices</h2><p>Smart watches, bands, and medical devices.</p></div><div class="round chat"></div></header>
+          <section class="card ai-card" style="grid-template-columns:64px 1fr;"><img class="mascot small" src="assets/caro-mascot.svg" alt="Caro"><div><h3>Caro is syncing data</h3><p>4 devices connected. Last update 2 minutes ago.</p><div class="online">All sources fresh</div></div></section>
+          <div class="section"><h3>Connected</h3><a href="#">Manage</a></div>
+          <div class="device-strip"><div class="device-card"><div class="device-art"></div><b>Apple Watch</b><span>Connected<br>95%</span></div><div class="device-card"><div class="device-art bp"></div><b>BP Monitor</b><span>Connected<br>85%</span></div><div class="device-card"><div class="device-art gluco"></div><b>Glucometer</b><span>Connected<br>90%</span></div><div class="device-card"><div class="device-art oxy"></div><b>Pulse Ox</b><span>Connected<br>88%</span></div></div>
+          <div class="section"><h3>Connection Methods</h3><a href="#">Add</a></div>
+          <div class="stack"><div class="wide-card"><span class="circle">OS</span><div><b>HealthKit / Health Connect</b><span>Wearables and health apps already synced to phone.</span></div></div><div class="wide-card"><span class="circle" style="background:var(--green)">BLE</span><div><b>Medical Bluetooth</b><span>BP, glucose, SpO2, temperature, ECG, weight.</span></div></div><div class="wide-card"><span class="circle" style="background:var(--orange)">OCR</span><div><b>Photo fallback</b><span>Unsupported devices still work through photos.</span></div></div></div>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab active"><span class="tab-icon device"></span><span>Devices</span></div><div class="tab"><span class="plus"></span></div><div class="tab"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-add-device">
+        <div class="screen">
+          <div class="statusbar"><span>9:44</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Add Device</h2><p>Choose the best connection path for the patient.</p></div></header>
+          <div class="stack"><div class="wide-card"><span class="circle">1</span><div><b>Use phone health store</b><span>Recommended for Apple Watch, bands, rings, fitness apps.</span></div></div><div class="wide-card"><span class="circle" style="background:var(--green)">2</span><div><b>Pair Bluetooth medical device</b><span>Scan nearby BP monitor, glucometer, SpO2, thermometer.</span></div></div><div class="wide-card"><span class="circle" style="background:var(--purple)">3</span><div><b>Connect vendor account</b><span>Fitbit, Garmin, Oura, Dexcom, Omron, Withings.</span></div></div><div class="wide-card"><span class="circle" style="background:var(--orange)">4</span><div><b>Read from photo</b><span>Capture device screen or uploaded report using OCR.</span></div></div></div>
+          <button class="primary" style="width:100%;margin-top:4px;">Start Device Scan</button>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab active"><span class="tab-icon device"></span><span>Devices</span></div><div class="tab"><span class="plus"></span></div><div class="tab"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-medicines">
+        <div class="screen">
+          <div class="statusbar"><span>10:00</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Medicines</h2><p>Audible reminders with caretaker fallback.</p></div><div class="round bell"></div></header>
+          <section class="card ai-card" style="grid-template-columns:64px 1fr;"><img class="mascot small" src="assets/caro-mascot.svg" alt="Caro"><div><h3>Reminder due now</h3><p>Caro will speak the medicine reminder aloud.</p><div class="online">Sound enabled</div></div></section>
+          <div class="section"><h3>Today</h3><a href="#">Edit</a></div>
+          <div class="schedule"><div class="medicine"><span class="circle" style="background:var(--yellow);color:#5a4100;">Rx</span><div><b>Metformin 500 mg</b><span>After breakfast and dinner</span><br><span class="time-pill">10:00 AM due</span></div></div><div class="medicine"><span class="circle" style="background:var(--blue)">BP</span><div><b>Amlodipine 5 mg</b><span>After breakfast</span><br><span class="time-pill">Taken 8:15 AM</span></div></div></div>
+          <div class="button-row"><button class="primary">Taken</button><button class="secondary">Snooze</button></div>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab"><span class="tab-icon device"></span><span>Devices</span></div><div class="tab active"><span class="plus"></span></div><div class="tab"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-documents">
+        <div class="screen">
+          <div class="statusbar"><span>10:03</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Reports</h2><p>Upload from app, WhatsApp, or Telegram.</p></div><div class="orb small"></div></header>
+          <section class="card" style="padding:18px;margin-bottom:17px;"><h3 class="row-title" style="font-size:22px;">Prescription extracted</h3><p style="margin:7px 0 0;color:var(--muted);font-size:15px;line-height:1.3;">Review extracted medicines before they become reminders.</p></section>
+          <div class="stack"><div class="wide-card"><span class="circle" style="background:var(--blue)">PDF</span><div><b>Lab Report Apr 30</b><span>HbA1c 6.4, glucose trend, lipid panel.</span></div><span class="time-pill">review</span></div><div class="wide-card"><span class="circle" style="background:var(--yellow);color:#5a4100;">Rx</span><div><b>Medicine photo</b><span>Metformin schedule extracted with 91% confidence.</span></div><span class="time-pill">confirm</span></div><div class="wide-card"><span class="circle" style="background:var(--green)">DC</span><div><b>Discharge summary</b><span>Follow-up instruction found for next Monday.</span></div><span class="time-pill">done</span></div></div>
+          <button class="primary" style="width:100%;">Upload New Report</button>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab"><span class="tab-icon device"></span><span>Devices</span></div><div class="tab active"><span class="plus"></span></div><div class="tab"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-extraction-review">
+        <div class="screen">
+          <div class="statusbar"><span>10:04</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Review Facts</h2><p>Confirm extracted data before it affects reminders or answers.</p></div><div class="round bell"></div></header>
+          <div class="segmented"><span class="active">Needs Review</span><span>Approved</span></div>
+          <div class="fact-card"><b>Metformin 500 mg</b><span>Timing: after breakfast and dinner. Confidence 91%. Source: prescription photo, line 4.</span><div class="fact-actions"><button>Confirm</button><button>Edit</button><button>Reject</button></div></div>
+          <div class="fact-card"><b>HbA1c 6.4%</b><span>Collected Apr 30. Reference range marked high in lab report. Confidence 97%.</span><div class="fact-actions"><button>Confirm</button><button>Edit</button><button>Reject</button></div></div>
+          <div class="fact-card"><b>Follow-up Monday</b><span>Doctor note says review BP log next Monday. Confidence 84%.</span><div class="fact-actions"><button>Confirm</button><button>Edit</button><button>Reject</button></div></div>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab"><span class="tab-icon device"></span><span>Devices</span></div><div class="tab active"><span class="plus"></span></div><div class="tab"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-caro">
+        <div class="screen">
+          <div class="statusbar"><span>10:05</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Ask Caro</h2><p>Grounded in reports, medicines, and live device data.</p></div><img class="mascot small" src="assets/caro-mascot.svg" alt="Caro"></header>
+          <div class="bubble-list"><div class="bubble user">What medicine do I take after breakfast?</div><div class="bubble agent">Metformin 500 mg, 1 tablet after breakfast.<span class="source">Source: reviewed prescription, Apr 30</span></div><div class="bubble user">Send today's update to Amit.</div><div class="bubble agent">I can send a WhatsApp summary after your confirmation.</div></div>
+          <div class="section"><h3>Actions</h3><a href="#">Safe</a></div>
+          <div class="button-row"><button class="primary">Upload Report</button><button class="secondary">Ask Vitals</button></div>
+          <div class="stack" style="margin-top:14px;"><div class="wide-card"><span class="circle" style="background:var(--green)">WA</span><div><b>WhatsApp connected</b><span>Reports, reminders, summaries, alerts.</span></div></div><div class="wide-card"><span class="circle">TG</span><div><b>Telegram connected</b><span>Ask questions and upload documents.</span></div></div></div>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab"><span class="tab-icon device"></span><span>Devices</span></div><div class="tab active"><span class="plus"></span></div><div class="tab"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-channels">
+        <div class="screen">
+          <div class="statusbar"><span>10:07</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Channels</h2><p>Control what Caro can do from app, WhatsApp, Telegram, SMS, and calls.</p></div><div class="round chat"></div></header>
+          <section class="card ai-card" style="grid-template-columns:64px 1fr;"><img class="mascot small" src="assets/caro-mascot.svg" alt="Caro"><div><h3>Multi-channel guardian</h3><p>Every outbound action uses consent, disclosure, and audit logs.</p><div class="online">Ready</div></div></section>
+          <div class="status-matrix"><div class="status-block"><strong>App</strong><span>Full control, reports, reminders, live vitals.</span></div><div class="status-block"><strong>WA</strong><span>Chat, uploads, updates, alert messages.</span></div><div class="status-block"><strong>TG</strong><span>Family bot, document upload, quick Q&A.</span></div><div class="status-block"><strong>Call</strong><span>AI voice with disclosure and escalation script.</span></div></div>
+          <div class="section"><h3>Default Rule</h3><a href="#">Edit</a></div>
+          <div class="wide-card"><span class="circle" style="background:var(--green)">OK</span><div><b>Ask before routine messages</b><span>Critical alerts can bypass confirmation only when emergency consent is active.</span></div></div>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab"><span class="tab-icon device"></span><span>Devices</span></div><div class="tab active"><span class="plus"></span></div><div class="tab"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-channel-thread">
+        <div class="screen">
+          <div class="statusbar"><span>10:08</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>WhatsApp Flow</h2><p>Same care workflows, constrained by channel policy and opt-in.</p></div><div class="round chat"></div></header>
+          <div class="message-card"><b>Patient uploads report</b><span>Image received from verified WhatsApp number. CareAgent asks consent before adding it to the health record.</span></div>
+          <div class="message-card"><b>Medicine reminder</b><span>"Metformin 500 mg is due. Reply 1 taken, 2 snooze, 3 ask Caro."</span></div>
+          <div class="message-card"><b>Caretaker summary</b><span>"Ramesh is stable today. BP 118/76, SpO2 98%, medicine taken 8:15 AM."</span></div>
+          <div class="message-card" style="border-color:rgba(255,55,95,.22);"><b>Urgent alert template</b><span>"Heart rate dropped to 38 bpm at 11:42 from Watch BLE. Reply 1 acknowledge, 2 call doctor, 3 escalate."</span></div>
+          <section class="flow-card" style="padding:15px;"><h3 style="font-size:18px;">Telegram commands</h3><p>/summary, /medicines, /upload, /devices, /alerts, /help are mapped to the same backend policies.</p></section>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab"><span class="tab-icon device"></span><span>Devices</span></div><div class="tab active"><span class="plus"></span></div><div class="tab"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-contacts">
+        <div class="screen">
+          <div class="statusbar"><span>10:09</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Care Contacts</h2><p>Escalation order for nurses, family, doctors, and ambulance.</p></div><div class="round bell"></div></header>
+          <div class="section"><h3>Emergency Order</h3><a href="#">Reorder</a></div>
+          <div class="stack"><div class="contact-card"><span class="circle" style="background:var(--green)">1</span><div><b>Amit Sharma</b><span>Son, primary caretaker. WhatsApp and call.</span></div><span class="contact-action">Call</span></div><div class="contact-card"><span class="circle" style="background:var(--blue)">2</span><div><b>Nurse Kavita</b><span>Home nurse. Receives daily summaries.</span></div><span class="contact-action">WA</span></div><div class="contact-card"><span class="circle" style="background:var(--purple)">3</span><div><b>Dr. Mehra</b><span>Cardiologist. Call only on high risk.</span></div><span class="contact-action">Call</span></div><div class="contact-card"><span class="circle" style="background:var(--red)">SOS</span><div><b>City Ambulance</b><span>Use only for critical protocol approval.</span></div><span class="contact-action">112</span></div></div>
+          <button class="primary" style="width:100%;margin-top:2px;">Add Contact</button>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab"><span class="tab-icon device"></span><span>Devices</span></div><div class="tab"><span class="plus"></span></div><div class="tab active"><span class="tab-icon bell"></span><span>Contacts</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-consent">
+        <div class="screen">
+          <div class="statusbar"><span>10:11</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Guardian Policy</h2><p>Patient-approved limits for automatic calls, messages, and device access.</p></div><img class="mascot small" src="assets/caro-mascot.svg" alt="Caro"></header>
+          <section class="policy-card"><h3>Emergency automation</h3><p>Caro can call and message contacts without a tap only when the risk engine marks the event critical.</p><div class="risk-scale"><span style="background:var(--green)">normal</span><span style="background:var(--orange)">watch</span><span style="background:var(--red)">critical</span></div></section>
+          <div class="permission-list"><div class="permission-row"><div><b>Use live health data</b><span>Read HealthKit, Health Connect, BLE, and approved vendors.</span></div><span class="switch on"></span></div><div class="permission-row"><div><b>Call caretakers automatically</b><span>Allowed only for critical protocol and failed patient response.</span></div><span class="switch on"></span></div><div class="permission-row"><div><b>Speak on patient's behalf</b><span>AI disclosure is spoken at the start of every call.</span></div><span class="switch on"></span></div><div class="permission-row"><div><b>Share live location</b><span>Emergency contacts only, expires after incident closes.</span></div><span class="switch"></span></div></div>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab"><span class="tab-icon device"></span><span>Devices</span></div><div class="tab"><span class="plus"></span></div><div class="tab"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab active"><span class="tab-icon user"></span><span>Policy</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-alerts">
+        <div class="screen">
+          <div class="statusbar"><span>11:10</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Alerts</h2><p>Risk events show severity, evidence, source, and what happened next.</p></div><div class="round bell notice"></div></header>
+          <div class="segmented"><span class="active">Active</span><span>History</span></div>
+          <div class="alert-card critical"><div class="alert-top"><div><b>High heart rate detected</b><span>Today, 8:30 AM</span></div><span class="status-pill red">high</span></div><div class="evidence"><span><b>132</b>BPM</span><span><b>5m</b>duration</span><span><b>Watch</b>live</span></div></div>
+          <div class="alert-card"><div class="alert-top"><div><b>BP reading needs recheck</b><span>Yesterday, 9:12 PM</span></div><span class="status-pill">moderate</span></div><div class="evidence"><span><b>148/92</b>mmHg</span><span><b>1</b>source</span><span><b>Ask</b>patient</span></div></div>
+          <div class="alert-card"><div class="alert-top"><div><b>Device data stale</b><span>Pulse oximeter, 4 hours ago</span></div><span class="status-pill">low</span></div><div class="evidence"><span><b>4h</b>stale</span><span><b>88%</b>battery</span><span><b>Retry</b>sync</span></div></div>
+          <div class="button-row"><button class="primary">Acknowledge</button><button class="secondary">Ask Caro</button></div>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab"><span class="tab-icon device"></span><span>Devices</span></div><div class="tab"><span class="plus"></span></div><div class="tab active"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-checkin">
+        <div class="screen">
+          <div class="statusbar"><span>11:12</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Quick Check-in</h2><p>Moderate risk asks the patient before notifying the care team.</p></div><img class="mascot small" src="assets/caro-mascot.svg" alt="Caro"></header>
+          <section class="flow-card" style="border-color:rgba(255,138,31,.24);background:linear-gradient(180deg,rgba(255,255,255,.94),rgba(255,247,238,.84));"><h3>Are you feeling unwell?</h3><p>Your BP reading was 148/92 from the cuff at 11:10. CareAgent will notify Amit if there is no response in 2 minutes.</p></section>
+          <div class="catalog-grid"><div class="catalog-item"><span class="circle" style="background:var(--red)">1</span><b>Chest pain</b><span>Escalate immediately.</span></div><div class="catalog-item"><span class="circle" style="background:var(--orange)">2</span><b>Dizziness</b><span>Notify caretaker.</span></div><div class="catalog-item"><span class="circle" style="background:var(--purple)">3</span><b>Breathless</b><span>Start urgent protocol.</span></div><div class="catalog-item"><span class="circle" style="background:var(--green)">OK</span><b>I feel fine</b><span>Log and recheck later.</span></div></div>
+          <button class="danger" style="width:100%;margin-bottom:10px;">I Need Help</button><button class="ghost" style="width:100%;">Recheck Reading</button>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab"><span class="tab-icon device"></span><span>Devices</span></div><div class="tab"><span class="plus"></span></div><div class="tab active"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-emergency">
+        <div class="screen">
+          <div class="statusbar"><span>11:42</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Emergency Protocol</h2><p>Caro is acting with patient authorization.</p></div><div class="round bell notice"></div></header>
+          <section class="card" style="padding:20px;text-align:center;border-color:rgba(255,55,95,.24);background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(255,238,242,.86));margin-bottom:17px;"><img class="mascot small alert" style="margin:0 auto 12px;" src="assets/caro-mascot.svg" alt="Caro"><h3 class="row-title" style="font-size:29px;line-height:1;">Heart rate dropped fast</h3><p style="max-width:280px;margin:10px auto 0;color:var(--muted);font-size:15px;line-height:1.28;">38 BPM from Watch BLE. Confidence 94%. Emergency consent is active.</p></section>
+          <div class="timeline"><div class="timeline-row"><time>11:42</time><div><b>Anomaly detected</b><span>72 to 38 BPM within 40 seconds.</span></div></div><div class="timeline-row"><time>11:42</time><div><b>Policy approved</b><span>Location sharing and calls are permitted.</span></div></div><div class="timeline-row"><time>11:43</time><div><b>Calls initiated</b><span>Caretaker, doctor, and ambulance contact.</span></div></div><div class="timeline-row"><time>11:43</time><div><b>AI disclosure included</b><span>This is CareAgent calling with authorization.</span></div></div></div>
+          <div class="button-row"><button class="danger">Call Caretaker</button><button class="ghost">False Alarm</button></div>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab"><span class="tab-icon device"></span><span>Devices</span></div><div class="tab"><span class="plus"></span></div><div class="tab active"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-voice-call">
+        <div class="screen">
+          <div class="statusbar"><span>11:43</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Voice Call</h2><p>Programmable voice call with approved script and response options.</p></div><div class="round bell notice"></div></header>
+          <section class="call-screen"><img class="mascot avatar alert" style="margin:0 auto 16px;" src="assets/caro-mascot.svg" alt="Caro"><h3>Calling Amit Sharma</h3><p>"This is CareAgent, an AI assistant calling with authorization from Ramesh Sharma."</p><div class="call-options"><span>1 Ack</span><span>2 Repeat</span><span>3 Doctor</span></div></section>
+          <div class="timeline"><div class="timeline-row"><time>11:43</time><div><b>Call connected</b><span>Primary caretaker answered.</span></div></div><div class="timeline-row"><time>11:43</time><div><b>Summary spoken</b><span>HR, source, timestamp, location permission.</span></div></div><div class="timeline-row"><time>11:44</time><div><b>Awaiting response</b><span>DTMF or speech acknowledgement.</span></div></div></div>
+          <button class="danger" style="width:100%;margin-bottom:10px;">Escalate Next Contact</button><button class="ghost" style="width:100%;">End Test Call</button>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab"><span class="tab-icon device"></span><span>Devices</span></div><div class="tab"><span class="plus"></span></div><div class="tab active"><span class="tab-icon bell"></span><span>Calls</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-caretaker">
+        <div class="screen">
+          <div class="statusbar"><span>9:50</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Care Team</h2><p>4 patients sorted by who needs attention now.</p></div><div class="round bell notice"></div></header>
+          <div class="stack"><div class="patient-card"><div class="patient-top"><div class="person"><div class="avatar">R</div><div><b>Ravi Sharma</b><span>67M, cardiac risk</span></div></div><span class="status-pill red">critical</span></div><div class="mini-stats"><span><b>38</b>HR bpm</span><span><b>GPS</b>shared</span><span><b>call</b>active</span></div></div><div class="patient-card"><div class="patient-top"><div class="person"><div class="avatar">M</div><div><b>Meena Pal</b><span>Diabetes</span></div></div><span class="status-pill">steady</span></div><div class="mini-stats"><span><b>122/78</b>BP</span><span><b>96%</b>SpO2</span><span><b>fresh</b>watch</span></div></div><div class="patient-card"><div class="patient-top"><div class="person"><div class="avatar">A</div><div><b>Arun Dua</b><span>Hypertension</span></div></div><span class="status-pill">check</span></div><div class="mini-stats"><span><b>2h</b>stale</span><span><b>due</b>meds</span><span><b>ask</b>Caro</span></div></div></div>
+          <nav class="tabbar"><div class="tab active"><span class="tab-icon heart"></span><span>Roster</span></div><div class="tab"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="plus"></span></div><div class="tab"><span class="tab-icon device"></span><span>Docs</span></div><div class="tab"><span class="tab-icon user"></span><span>Team</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-caretaker-alerts">
+        <div class="screen">
+          <div class="statusbar"><span>9:50</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Alert Inbox</h2><p>Acknowledge, assign, call, message, or escalate.</p></div><div class="round bell notice"></div></header>
+          <div class="segmented"><span class="active">Unassigned</span><span>Mine</span></div>
+          <div class="alert-card critical"><div class="alert-top"><div><b>Ravi Sharma</b><span>Critical HR event, 11:42 PM</span></div><span class="status-pill red">P1</span></div><div class="evidence"><span><b>38</b>HR bpm</span><span><b>94%</b>confidence</span><span><b>0</b>ack</span></div></div>
+          <div class="button-row" style="margin-bottom:12px;"><button class="danger">Call</button><button class="secondary">Assign</button></div>
+          <div class="alert-card"><div class="alert-top"><div><b>Meena Pal</b><span>Missed diabetes medicine</span></div><span class="status-pill">P3</span></div><div class="evidence"><span><b>2h</b>late</span><span><b>WA</b>sent</span><span><b>ask</b>patient</span></div></div>
+          <div class="alert-card"><div class="alert-top"><div><b>Arun Dua</b><span>BP monitor disconnected</span></div><span class="status-pill">P4</span></div><div class="evidence"><span><b>9h</b>stale</span><span><b>BLE</b>lost</span><span><b>retry</b>sync</span></div></div>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Roster</span></div><div class="tab active"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="plus"></span></div><div class="tab"><span class="tab-icon device"></span><span>Docs</span></div><div class="tab"><span class="tab-icon user"></span><span>Team</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-patient-detail">
+        <div class="screen">
+          <div class="statusbar"><span>9:51</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Ravi Sharma</h2><p>Critical event in progress. Care team view.</p></div><div class="round bell notice"></div></header>
+          <section class="card" style="padding:18px;margin-bottom:16px;border-color:rgba(255,55,95,.22);background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(255,240,244,.82));"><div class="patient-top" style="margin-bottom:12px;"><div class="person"><div class="avatar" style="background:rgba(255,55,95,.12);color:var(--red);">R</div><div><b>Heart rate critical</b><span>38 BPM from Apple Watch, live</span></div></div><span class="status-pill red">active</span></div><div class="mini-stats"><span><b>94%</b>confidence</span><span><b>112</b>ambulance</span><span><b>GPS</b>shared</span></div></section>
+          <div class="button-row" style="margin-bottom:15px;"><button class="danger">Join Call</button><button class="secondary">Message</button></div>
+          <div class="section"><h3>Incident Timeline</h3><a href="#">Full</a></div>
+          <div class="timeline"><div class="timeline-row"><time>11:42</time><div><b>Watch reading changed</b><span>HR fell from 72 to 38 BPM.</span></div></div><div class="timeline-row"><time>11:43</time><div><b>Caro called Amit</b><span>AI disclosed identity and shared latest data.</span></div></div><div class="timeline-row"><time>11:44</time><div><b>Doctor notified</b><span>Cardiologist received report summary.</span></div></div></div>
+          <div class="call-script">Call script: "This is CareAgent calling with Ravi Sharma's authorization. A critical heart rate anomaly was detected from his watch. Please confirm if you are with him."</div>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Roster</span></div><div class="tab active"><span class="tab-icon bell"></span><span>Incident</span></div><div class="tab"><span class="plus"></span></div><div class="tab"><span class="tab-icon device"></span><span>Docs</span></div><div class="tab"><span class="tab-icon user"></span><span>Team</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="flow-regular-updates">
+        <div class="screen">
+          <div class="statusbar"><span>9:52</span><span class="system"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <header class="nav-title"><div><h2>Update Rules</h2><p>Regular summaries are separate from urgent alert automation.</p></div><div class="round chat"></div></header>
+          <section class="form-card"><div class="form-row"><b>Daily summary</b><span>8:00 PM, WhatsApp</span></div><div class="form-row"><b>Weekly report</b><span>Sunday, PDF</span></div><div class="form-row"><b>Missed medicine</b><span>After 30 minutes</span></div><div class="form-row"><b>Stale device</b><span>After 4 hours</span></div><div class="form-row"><b>Quiet hours</b><span>10 PM to 7 AM</span></div></section>
+          <div class="section"><h3>Summary Includes</h3><a href="#">Edit</a></div>
+          <div class="catalog-grid compact"><div class="catalog-item"><span class="circle" style="background:var(--red)">HR</span><b>Vitals</b><span>Latest, trend, abnormal flags.</span></div><div class="catalog-item"><span class="circle" style="background:var(--green)">Rx</span><b>Meds</b><span>Taken, missed, snoozed.</span></div></div>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Roster</span></div><div class="tab"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="plus"></span></div><div class="tab"><span class="tab-icon device"></span><span>Docs</span></div><div class="tab active"><span class="tab-icon user"></span><span>Rules</span></div></nav><div class="home-indicator"></div>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

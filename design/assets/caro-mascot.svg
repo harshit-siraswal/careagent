@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Caro health guardian mascot</title>
+  <desc id="desc">A soft white healthcare robot with a dark visor, cyan eyes, antenna, and stethoscope.</desc>
+  <defs>
+    <radialGradient id="shell" cx="34%" cy="18%" r="82%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.45" stop-color="#f5fbff"/>
+      <stop offset="1" stop-color="#d8e7f6"/>
+    </radialGradient>
+    <linearGradient id="edge" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.52" stop-color="#e8f2fb"/>
+      <stop offset="1" stop-color="#a9c1d7"/>
+    </linearGradient>
+    <linearGradient id="visor" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#15273e"/>
+      <stop offset="0.52" stop-color="#071426"/>
+      <stop offset="1" stop-color="#000817"/>
+    </linearGradient>
+    <radialGradient id="cyanGlow" cx="45%" cy="35%" r="64%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.22" stop-color="#9df7ff"/>
+      <stop offset="0.64" stop-color="#20c6ed"/>
+      <stop offset="1" stop-color="#0082c8"/>
+    </radialGradient>
+    <filter id="softShadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="22" stdDeviation="28" flood-color="#0e3458" flood-opacity="0.18"/>
+    </filter>
+    <filter id="cyanBlur" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="9"/>
+    </filter>
+  </defs>
+
+  <ellipse cx="512" cy="892" rx="248" ry="42" fill="#47d9ff" opacity="0.16"/>
+
+  <g filter="url(#softShadow)">
+    <path d="M508 168c-22 0-40 18-40 40v44h80v-44c0-22-18-40-40-40z" fill="url(#edge)" stroke="#6f95b5" stroke-width="8"/>
+    <circle cx="508" cy="142" r="46" fill="url(#cyanGlow)"/>
+    <circle cx="492" cy="126" r="13" fill="#fff" opacity="0.7"/>
+
+    <path d="M236 417c-73 3-126 58-126 129 0 69 51 124 122 128l33-257h-29z" fill="url(#edge)" stroke="#6f95b5" stroke-width="8"/>
+    <path d="M788 417c73 3 126 58 126 129 0 69-51 124-122 128l-33-257h29z" fill="url(#edge)" stroke="#6f95b5" stroke-width="8"/>
+    <path d="M159 545c0-48 35-84 79-88v174c-44-4-79-40-79-86z" fill="#e6f5ff" opacity="0.82"/>
+    <path d="M865 545c0-48-35-84-79-88v174c44-4 79-40 79-86z" fill="#e6f5ff" opacity="0.82"/>
+
+    <rect x="158" y="238" width="708" height="418" rx="206" fill="url(#shell)" stroke="#95b3cc" stroke-width="10"/>
+    <rect x="248" y="322" width="528" height="238" rx="119" fill="url(#visor)" stroke="#6ba5d1" stroke-width="12"/>
+    <path d="M326 318c80-59 285-76 399-8-112-36-294-30-399 8z" fill="#ffffff" opacity="0.5"/>
+    <ellipse cx="436" cy="442" rx="45" ry="57" fill="url(#cyanGlow)"/>
+    <ellipse cx="596" cy="442" rx="45" ry="57" fill="url(#cyanGlow)"/>
+    <ellipse cx="423" cy="419" rx="13" ry="17" fill="#ffffff" opacity="0.8"/>
+    <ellipse cx="583" cy="419" rx="13" ry="17" fill="#ffffff" opacity="0.8"/>
+    <circle cx="436" cy="442" r="64" fill="#34dcff" opacity="0.28" filter="url(#cyanBlur)"/>
+    <circle cx="596" cy="442" r="64" fill="#34dcff" opacity="0.28" filter="url(#cyanBlur)"/>
+    <circle cx="510" cy="504" r="14" fill="#72efff"/>
+    <circle cx="468" cy="503" r="9" fill="#39d6ff"/>
+    <circle cx="552" cy="503" r="9" fill="#39d6ff"/>
+    <circle cx="336" cy="443" r="8" fill="#18bfff" opacity="0.75"/>
+    <circle cx="684" cy="458" r="8" fill="#18bfff" opacity="0.55"/>
+    <ellipse cx="682" cy="359" rx="23" ry="13" fill="#ffffff" opacity="0.82" transform="rotate(15 682 359)"/>
+    <circle cx="712" cy="379" r="10" fill="#8cf5ff" opacity="0.72"/>
+
+    <path d="M323 656c14 128 84 213 190 213 105 0 174-85 188-213H323z" fill="url(#shell)" stroke="#95b3cc" stroke-width="9"/>
+    <path d="M405 664c42 31 171 31 213 0-20 52-51 85-106 85-56 0-88-33-107-85z" fill="#0a1a2b" opacity="0.12"/>
+    <circle cx="512" cy="705" r="65" fill="url(#cyanGlow)" stroke="#6f95b5" stroke-width="8"/>
+    <circle cx="512" cy="705" r="42" fill="#e9fdff" opacity="0.62"/>
+    <path d="M476 701c-12-20 12-45 34-25 22-20 47 5 35 25-8 15-24 25-35 34-11-9-26-19-34-34z" fill="#ffffff"/>
+
+    <path d="M322 692c-61 22-104 73-117 149" fill="none" stroke="#12344f" stroke-width="28" stroke-linecap="round"/>
+    <path d="M310 704c-53 22-85 68-96 132" fill="none" stroke="#15b8dd" stroke-width="18" stroke-linecap="round"/>
+    <path d="M702 692c61 22 104 73 117 149" fill="none" stroke="#12344f" stroke-width="28" stroke-linecap="round"/>
+    <path d="M714 704c53 22 85 68 96 132" fill="none" stroke="#15b8dd" stroke-width="18" stroke-linecap="round"/>
+    <circle cx="819" cy="845" r="62" fill="url(#cyanGlow)" stroke="#12344f" stroke-width="13"/>
+    <circle cx="819" cy="845" r="44" fill="#e9fdff" opacity="0.5"/>
+    <path d="M770 845h31l13-24 21 50 15-26h20" fill="none" stroke="#ffffff" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <path d="M306 679c-46 14-76 50-84 103" fill="none" stroke="#95b3cc" stroke-width="9" stroke-linecap="round"/>
+    <path d="M717 679c46 14 76 50 84 103" fill="none" stroke="#95b3cc" stroke-width="9" stroke-linecap="round"/>
+    <path d="M349 825c-47 8-85 39-102 83" fill="none" stroke="#9eb8cf" stroke-width="9" stroke-linecap="round"/>
+    <path d="M674 825c47 8 85 39 102 83" fill="none" stroke="#9eb8cf" stroke-width="9" stroke-linecap="round"/>
+  </g>
+</svg>

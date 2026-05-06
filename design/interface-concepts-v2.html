@@ -1,0 +1,873 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CareAgent Minimal App Concepts</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --phone: #ffffff;
+      --ink: #202936;
+      --muted: #6d7684;
+      --soft: #eef3f7;
+      --line: #e4e9ef;
+      --green: #58cc02;
+      --green-dark: #36a000;
+      --mint: #a9f2dc;
+      --mint-dark: #22b994;
+      --yellow: #ffc933;
+      --red: #ff5a66;
+      --red-dark: #d73e4a;
+      --blue: #4aa9ff;
+      --shadow: 0 24px 54px rgba(31, 42, 56, 0.13);
+      --card-shadow: 0 10px 24px rgba(31, 42, 56, 0.07);
+      --radius: 24px;
+      --ease: cubic-bezier(.2,.8,.2,1);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: "Nunito", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    body {
+      background:
+        linear-gradient(180deg, #fbfcfd 0%, #f4f7fa 100%);
+    }
+
+    .board {
+      width: min(1760px, 100%);
+      margin: 0 auto;
+      padding: 40px 38px 48px;
+    }
+
+    .board-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 28px;
+      margin-bottom: 32px;
+    }
+
+    .kicker {
+      margin: 0 0 8px;
+      color: var(--green-dark);
+      font-size: 13px;
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3, p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 44px;
+      line-height: 1;
+      letter-spacing: 0;
+      font-weight: 900;
+    }
+
+    .board-head p {
+      max-width: 560px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.35;
+      font-weight: 700;
+    }
+
+    .screens {
+      display: grid;
+      grid-template-columns: repeat(5, 312px);
+      gap: 26px;
+      align-items: start;
+    }
+
+    .phone {
+      width: 312px;
+      height: 700px;
+      border: 8px solid #111824;
+      border-radius: 42px;
+      background: var(--phone);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      position: relative;
+    }
+
+    .phone::before {
+      content: "";
+      position: absolute;
+      top: 9px;
+      left: 50%;
+      z-index: 20;
+      width: 80px;
+      height: 22px;
+      transform: translateX(-50%);
+      border-radius: 99px;
+      background: #111824;
+    }
+
+    .screen {
+      height: 100%;
+      padding: 38px 18px 88px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 42px;
+      margin-bottom: 10px;
+    }
+
+    .logo {
+      font-size: 23px;
+      line-height: 1;
+      font-weight: 900;
+    }
+
+    .status-dot {
+      min-width: 58px;
+      height: 30px;
+      border-radius: 999px;
+      display: inline-grid;
+      place-items: center;
+      padding: 0 10px;
+      background: #effbe8;
+      color: var(--green-dark);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .status-dot.red {
+      background: #fff0f1;
+      color: var(--red-dark);
+    }
+
+    .hero {
+      display: grid;
+      place-items: center;
+      min-height: 200px;
+      padding: 16px 8px 10px;
+      text-align: center;
+    }
+
+    .mascot {
+      width: 128px;
+      height: 128px;
+      position: relative;
+      margin-bottom: 13px;
+      filter: drop-shadow(0 16px 18px rgba(34,185,148,.16));
+      animation: float 3.2s var(--ease) infinite;
+    }
+
+    .mascot.mini {
+      width: 72px;
+      height: 72px;
+      margin: 0;
+    }
+
+    .mascot.mini .body-shape {
+      inset: 9px 10px 6px;
+      border-width: 2.4px;
+    }
+
+    .mascot.mini .leaf {
+      left: 10px;
+      top: 4px;
+      width: 22px;
+      height: 18px;
+      border-width: 2.4px;
+    }
+
+    .mascot.mini .face {
+      left: 24px;
+      top: 34px;
+      gap: 14px;
+    }
+
+    .mascot.mini .eye {
+      width: 6px;
+      height: 9px;
+    }
+
+    .mascot.mini .mouth {
+      left: 30px;
+      top: 48px;
+      width: 13px;
+      height: 8px;
+      border-width: 2.4px;
+      border-top: 0;
+    }
+
+    .mascot.mini .pulse {
+      border-width: 2px;
+    }
+
+    .mascot.alert {
+      filter: drop-shadow(0 16px 18px rgba(255,90,102,.14));
+    }
+
+    .body-shape {
+      position: absolute;
+      inset: 15px 17px 10px;
+      border-radius: 54% 54% 48% 48%;
+      background: linear-gradient(180deg, #d9fff3 0%, #88efce 100%);
+      border: 4px solid #1b2836;
+    }
+
+    .mascot.alert .body-shape {
+      background: linear-gradient(180deg, #fff4f4 0%, #ffb4bb 100%);
+    }
+
+    .leaf {
+      position: absolute;
+      left: 18px;
+      top: 8px;
+      width: 38px;
+      height: 31px;
+      border-radius: 26px 26px 6px 26px;
+      background: var(--green);
+      border: 4px solid #1b2836;
+      transform: rotate(-22deg);
+      transform-origin: 80% 90%;
+      animation: leaf-wave 3.2s var(--ease) infinite;
+    }
+
+    .face {
+      position: absolute;
+      left: 43px;
+      top: 60px;
+      display: flex;
+      gap: 25px;
+      align-items: center;
+    }
+
+    .eye {
+      width: 10px;
+      height: 15px;
+      border-radius: 99px;
+      background: #1b2836;
+      animation: blink 4.8s ease-in-out infinite;
+    }
+
+    .mouth {
+      position: absolute;
+      left: 54px;
+      top: 85px;
+      width: 22px;
+      height: 13px;
+      border: 4px solid #1b2836;
+      border-top: 0;
+      border-radius: 0 0 20px 20px;
+    }
+
+    .pulse {
+      position: absolute;
+      inset: -2px;
+      border-radius: 50%;
+      border: 3px solid rgba(88, 204, 2, .18);
+      animation: ring 2.6s ease-out infinite;
+    }
+
+    .mascot.alert .pulse {
+      border-color: rgba(255,90,102,.22);
+      animation-duration: 1.25s;
+    }
+
+    .hero h2 {
+      font-size: 27px;
+      line-height: .98;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+
+    .hero p {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.25;
+      font-weight: 700;
+      max-width: 225px;
+    }
+
+    .progress {
+      height: 14px;
+      border-radius: 999px;
+      background: #e8eef4;
+      overflow: hidden;
+      margin: 10px 0 2px;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      width: 78%;
+      border-radius: inherit;
+      background: var(--green);
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 14px 0 9px;
+      font-size: 15px;
+      font-weight: 900;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .tile, .wide-card, .message, .patient {
+      background: #fff;
+      border: 2px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--card-shadow);
+    }
+
+    .tile {
+      min-height: 78px;
+      padding: 13px;
+    }
+
+    .tile strong {
+      display: block;
+      font-size: 24px;
+      line-height: .9;
+      font-weight: 900;
+    }
+
+    .tile span {
+      display: block;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.15;
+      font-weight: 800;
+    }
+
+    .wide-card {
+      padding: 13px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 64px;
+    }
+
+    .circle {
+      width: 42px;
+      height: 42px;
+      flex: 0 0 42px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #effbe8;
+      color: var(--green-dark);
+      font-size: 14px;
+      font-weight: 900;
+      border: 2px solid #d4f4c5;
+    }
+
+    .circle.yellow {
+      background: #fff7d9;
+      border-color: #ffe58b;
+      color: #9b7100;
+    }
+
+    .circle.red {
+      background: #fff0f1;
+      border-color: #ffd3d7;
+      color: var(--red-dark);
+    }
+
+    .wide-card b {
+      display: block;
+      font-size: 14px;
+      line-height: 1.1;
+    }
+
+    .wide-card span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.18;
+      font-weight: 750;
+    }
+
+    .stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .bottom-nav {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: 14px;
+      height: 58px;
+      border-radius: 22px;
+      background: #fff;
+      border: 2px solid var(--line);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      align-items: center;
+      box-shadow: 0 14px 28px rgba(31,42,56,.08);
+    }
+
+    .bottom-nav span {
+      text-align: center;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .bottom-nav .active {
+      color: var(--green-dark);
+    }
+
+    .device-ring {
+      width: 160px;
+      height: 160px;
+      margin: 12px auto 6px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle, #fff 0 50%, transparent 51%),
+        conic-gradient(var(--green) 0 72%, #e8eef4 72% 100%);
+      display: grid;
+      place-items: center;
+      box-shadow: var(--card-shadow);
+      position: relative;
+    }
+
+    .device-ring b {
+      font-size: 40px;
+      font-weight: 900;
+    }
+
+    .device-ring span {
+      position: absolute;
+      bottom: 38px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .capsule-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 8px 0 14px;
+    }
+
+    .capsule-tabs span {
+      height: 36px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 900;
+      background: var(--soft);
+      color: var(--muted);
+    }
+
+    .capsule-tabs .active {
+      background: #effbe8;
+      color: var(--green-dark);
+    }
+
+    .chat-head {
+      min-height: 84px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 2px 8px;
+    }
+
+    .chat-head h2 {
+      font-size: 28px;
+      line-height: 1;
+      font-weight: 900;
+    }
+
+    .chat-head p {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.2;
+      font-weight: 750;
+    }
+
+    .bubble-stack {
+      display: grid;
+      gap: 9px;
+    }
+
+    .message {
+      padding: 12px 13px;
+      max-width: 238px;
+      font-size: 13px;
+      line-height: 1.25;
+      font-weight: 800;
+      box-shadow: none;
+    }
+
+    .message.user {
+      justify-self: end;
+      background: var(--ink);
+      color: white;
+      border-color: var(--ink);
+      border-bottom-right-radius: 8px;
+    }
+
+    .message.agent {
+      justify-self: start;
+      border-bottom-left-radius: 8px;
+    }
+
+    .source {
+      color: var(--green-dark);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .big-alert {
+      border-radius: 30px;
+      background: #fff0f1;
+      border: 2px solid #ffd4d8;
+      min-height: 205px;
+      padding: 18px 16px;
+      text-align: center;
+    }
+
+    .big-alert h2 {
+      font-size: 28px;
+      line-height: 1;
+      font-weight: 900;
+      margin-top: 8px;
+    }
+
+    .big-alert p {
+      margin: 8px auto 0;
+      max-width: 226px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.25;
+      font-weight: 750;
+    }
+
+    .button {
+      height: 50px;
+      border-radius: 18px;
+      border: 0;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .button.primary {
+      background: var(--green);
+      color: #10220a;
+      box-shadow: 0 8px 0 #36a000;
+    }
+
+    .button.danger {
+      background: var(--red);
+      color: #fff;
+      box-shadow: 0 8px 0 var(--red-dark);
+    }
+
+    .button.light {
+      background: #fff;
+      color: var(--ink);
+      border: 2px solid var(--line);
+    }
+
+    .mini-timeline {
+      display: grid;
+      gap: 9px;
+      margin: 13px 0;
+    }
+
+    .mini-row {
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .mini-row time {
+      color: var(--red-dark);
+      font-weight: 900;
+    }
+
+    .mini-row span {
+      color: var(--muted);
+      font-weight: 750;
+    }
+
+    .patient {
+      padding: 10px;
+      box-shadow: none;
+    }
+
+    .patient-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .person {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #dbf8cf;
+      color: var(--green-dark);
+      font-weight: 900;
+      border: 2px solid #c5efb5;
+    }
+
+    .person b {
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .patient-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+    }
+
+    .patient-stats span {
+      min-height: 36px;
+      border-radius: 16px;
+      padding: 7px;
+      background: var(--soft);
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1;
+      font-weight: 850;
+    }
+
+    .patient-stats b {
+      display: block;
+      color: var(--ink);
+      margin-bottom: 3px;
+      font-size: 13px;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-7px) rotate(-1deg); }
+    }
+
+    @keyframes blink {
+      0%, 91%, 100% { transform: scaleY(1); }
+      94% { transform: scaleY(.12); }
+    }
+
+    @keyframes leaf-wave {
+      0%, 100% { transform: rotate(-22deg); }
+      50% { transform: rotate(-8deg); }
+    }
+
+    @keyframes ring {
+      0% { opacity: .9; transform: scale(.7); }
+      100% { opacity: 0; transform: scale(1.08); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <header class="board-head">
+      <div>
+        <p class="kicker">CareAgent v2 visual system</p>
+        <h1>Minimal friendly care app</h1>
+      </div>
+      <p>Duolingo-inspired restraint: one mascot, bold rounded type, clear status, and fewer cards. Caro animates as a care companion, not as decoration.</p>
+    </header>
+
+    <section class="screens" aria-label="CareAgent mobile app concepts">
+      <article class="phone" id="v2-home">
+        <div class="screen">
+          <div class="top">
+            <div class="logo">CareAgent</div>
+            <span class="status-dot">safe</span>
+          </div>
+
+          <section class="hero">
+            <div class="mascot" aria-label="Caro mascot">
+              <div class="pulse"></div><div class="leaf"></div><div class="body-shape"></div>
+              <div class="face"><span class="eye"></span><span class="eye"></span></div><div class="mouth"></div>
+            </div>
+            <h2>Ravi is steady today</h2>
+            <p>Watch and BP monitor synced 4 minutes ago.</p>
+          </section>
+
+          <div class="progress"><span></span></div>
+          <div class="section-head">Live health <span class="small">fresh data</span></div>
+          <div class="grid2">
+            <div class="tile"><strong>78</strong><span>Heart rate<br>Watch live</span></div>
+            <div class="tile"><strong>118/76</strong><span>Blood pressure<br>BP cuff 9:32</span></div>
+          </div>
+          <div class="section-head">Next reminder <span class="small">10:00 AM</span></div>
+          <div class="wide-card"><div class="circle yellow">Rx</div><div><b>Metformin 500 mg</b><span>Caro will speak the reminder after breakfast.</span></div></div>
+          <nav class="bottom-nav"><span class="active">Home</span><span>Devices</span><span>Caro</span><span>SOS</span></nav>
+        </div>
+      </article>
+
+      <article class="phone" id="v2-devices">
+        <div class="screen">
+          <div class="top">
+            <div class="logo">Devices</div>
+            <span class="status-dot">82%</span>
+          </div>
+          <div class="device-ring"><b>82%</b><span>coverage</span></div>
+          <div class="capsule-tabs"><span class="active">Auto</span><span>BLE</span><span>Manual</span></div>
+          <div class="section-head">Connect sources <span class="small">near-universal</span></div>
+          <div class="stack">
+            <div class="wide-card"><div class="circle">OS</div><div><b>HealthKit / Health Connect</b><span>Smart watches, bands, rings, health apps.</span></div></div>
+            <div class="wide-card"><div class="circle">BT</div><div><b>Medical Bluetooth</b><span>BP, glucose, SpO2, temperature, weight.</span></div></div>
+            <div class="wide-card"><div class="circle yellow">OCR</div><div><b>Photo fallback</b><span>Unsupported devices still work by reading photos.</span></div></div>
+          </div>
+          <nav class="bottom-nav"><span>Home</span><span class="active">Devices</span><span>Caro</span><span>SOS</span></nav>
+        </div>
+      </article>
+
+      <article class="phone" id="v2-chat">
+        <div class="screen">
+          <div class="top">
+            <div class="logo">Caro</div>
+            <div class="mascot mini" aria-label="Caro mascot">
+              <div class="pulse"></div><div class="leaf"></div><div class="body-shape"></div>
+              <div class="face"><span class="eye"></span><span class="eye"></span></div><div class="mouth"></div>
+            </div>
+          </div>
+          <div class="chat-head">
+            <div><h2>Ask your records</h2><p>Reports, medicines, devices, and care updates.</p></div>
+          </div>
+          <div class="bubble-stack">
+            <div class="message user">What medicine after breakfast?</div>
+            <div class="message agent">Metformin 500 mg, 1 tablet after breakfast.<br><span class="source">Source: reviewed prescription, Apr 30</span></div>
+            <div class="message user">Upload my lab report</div>
+            <div class="message agent">Send a photo or PDF here. I will extract values for review before using them.</div>
+          </div>
+          <div class="section-head">Quick actions <span class="small">safe</span></div>
+          <div class="grid2">
+            <button class="button primary">Upload report</button>
+            <button class="button light">Ask vitals</button>
+          </div>
+          <nav class="bottom-nav"><span>Home</span><span>Devices</span><span class="active">Caro</span><span>SOS</span></nav>
+        </div>
+      </article>
+
+      <article class="phone" id="v2-alert">
+        <div class="screen">
+          <div class="top">
+            <div class="logo">SOS</div>
+            <span class="status-dot red">critical</span>
+          </div>
+          <section class="big-alert">
+            <div class="mascot mini alert" style="margin: 0 auto 6px;" aria-label="Caro urgent mascot">
+              <div class="pulse"></div><div class="leaf"></div><div class="body-shape"></div>
+              <div class="face"><span class="eye"></span><span class="eye"></span></div><div class="mouth"></div>
+            </div>
+            <h2>Heart rate dropped fast</h2>
+            <p>38 bpm from Watch BLE. Emergency consent is active.</p>
+          </section>
+          <div class="mini-timeline">
+            <div class="mini-row"><time>11:42</time><div><b>Anomaly detected</b><br><span>72 to 38 bpm in 40 sec.</span></div></div>
+            <div class="mini-row"><time>11:42</time><div><b>Policy approved</b><br><span>Location and calls allowed.</span></div></div>
+            <div class="mini-row"><time>11:43</time><div><b>Calling caretaker</b><br><span>AI disclosure included.</span></div></div>
+          </div>
+          <div class="stack">
+            <button class="button danger">Call primary caretaker</button>
+            <button class="button light">Cancel false alarm</button>
+          </div>
+          <nav class="bottom-nav"><span>Home</span><span>Devices</span><span>Caro</span><span class="active">SOS</span></nav>
+        </div>
+      </article>
+
+      <article class="phone" id="v2-caretaker">
+        <div class="screen">
+          <div class="top">
+            <div class="logo">Care team</div>
+            <span class="status-dot red">1 alert</span>
+          </div>
+          <section class="hero" style="min-height: 145px;">
+            <div class="mascot mini" aria-label="Caro mascot">
+              <div class="pulse"></div><div class="leaf"></div><div class="body-shape"></div>
+              <div class="face"><span class="eye"></span><span class="eye"></span></div><div class="mouth"></div>
+            </div>
+            <h2>4 patients</h2>
+            <p>Sorted by who needs attention now.</p>
+          </section>
+          <div class="stack">
+            <div class="patient">
+              <div class="patient-top"><div class="person"><div class="avatar">R</div><b>Ravi Sharma</b></div><span class="status-dot red">critical</span></div>
+              <div class="patient-stats"><span><b>38</b>HR bpm</span><span><b>GPS</b>shared</span><span><b>call</b>active</span></div>
+            </div>
+            <div class="patient">
+              <div class="patient-top"><div class="person"><div class="avatar">M</div><b>Meena Pal</b></div><span class="status-dot">steady</span></div>
+              <div class="patient-stats"><span><b>122/78</b>BP</span><span><b>96%</b>SpO2</span><span><b>fresh</b>watch</span></div>
+            </div>
+            <div class="patient">
+              <div class="patient-top"><div class="person"><div class="avatar">A</div><b>Arun Dua</b></div><span class="status-dot">check</span></div>
+              <div class="patient-stats"><span><b>2h</b>stale</span><span><b>due</b>meds</span><span><b>ask</b>Caro</span></div>
+            </div>
+          </div>
+          <nav class="bottom-nav"><span class="active">Roster</span><span>Alerts</span><span>Docs</span><span>Team</span></nav>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

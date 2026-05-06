@@ -1,0 +1,2 @@
+- article [ref=e9] [box=355,142,386,844]:
+  - generic [ref=e10] [box=363,151,369,827]

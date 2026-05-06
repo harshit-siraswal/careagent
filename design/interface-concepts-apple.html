@@ -1,0 +1,1257 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CareAgent Apple Style Interface</title>
+  <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: rgba(255, 255, 255, 0.82);
+      --card-solid: #ffffff;
+      --ink: #070a0f;
+      --muted: #68707f;
+      --line: rgba(30, 41, 59, 0.10);
+      --blue: #007aff;
+      --green: #34c759;
+      --red: #ff375f;
+      --purple: #af52de;
+      --teal: #30b7bd;
+      --orange: #ff8a1f;
+      --shadow: 0 20px 60px rgba(24, 37, 56, 0.12);
+      --soft-shadow: 0 10px 30px rgba(24, 37, 56, 0.08);
+      --radius-xl: 30px;
+      --radius-lg: 22px;
+      --radius-md: 18px;
+      --blur: blur(22px);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+      color: var(--ink);
+      background: radial-gradient(circle at 18% 0%, #ffffff 0 20%, transparent 44%),
+        radial-gradient(circle at 86% 8%, #eaf3ff 0 16%, transparent 38%),
+        linear-gradient(180deg, #f8faff 0%, #f3f6fb 100%);
+    }
+
+    .board {
+      width: min(1740px, 100%);
+      margin: 0 auto;
+      padding: 34px 34px 48px;
+    }
+
+    .board-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 24px;
+      gap: 32px;
+    }
+
+    .board-header h1 {
+      margin: 0;
+      font-size: 40px;
+      letter-spacing: -0.035em;
+      line-height: 1.02;
+      font-weight: 800;
+    }
+
+    .board-header p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.35;
+      max-width: 620px;
+      font-weight: 500;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      height: 30px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.7);
+      border: 1px solid var(--line);
+      color: #394150;
+      font-size: 13px;
+      font-weight: 600;
+      backdrop-filter: var(--blur);
+    }
+
+    .screens {
+      display: grid;
+      grid-template-columns: 520px 420px 420px 420px;
+      gap: 26px;
+      align-items: start;
+    }
+
+    .phone {
+      width: 420px;
+      height: 900px;
+      border-radius: 48px;
+      background: #f8faff;
+      border: 10px solid #111318;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      position: relative;
+    }
+
+    .phone.large {
+      width: 520px;
+      height: 1060px;
+    }
+
+    .phone::before {
+      content: "";
+      position: absolute;
+      z-index: 20;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 126px;
+      height: 30px;
+      border-radius: 999px;
+      background: #111318;
+    }
+
+    .screen {
+      height: 100%;
+      overflow: hidden;
+      position: relative;
+      padding: 22px 18px 96px;
+      background: radial-gradient(circle at 18% 5%, rgba(255,255,255,.96), transparent 34%),
+        radial-gradient(circle at 85% 0%, rgba(219, 235, 255, .78), transparent 26%),
+        #f7f9fd;
+    }
+
+    .statusbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 28px;
+      margin: 0 16px 18px;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .system-icons {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #111318;
+    }
+
+    .signal {
+      display: inline-flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 14px;
+    }
+
+    .signal i {
+      display: block;
+      width: 4px;
+      border-radius: 2px;
+      background: currentColor;
+    }
+
+    .signal i:nth-child(1) { height: 5px; }
+    .signal i:nth-child(2) { height: 8px; }
+    .signal i:nth-child(3) { height: 11px; }
+    .signal i:nth-child(4) { height: 14px; }
+
+    .wifi {
+      width: 20px;
+      height: 14px;
+      position: relative;
+    }
+
+    .wifi::before, .wifi::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 3px solid currentColor;
+      border-left-color: transparent;
+      border-right-color: transparent;
+      border-bottom: 0;
+      border-radius: 999px 999px 0 0;
+    }
+
+    .wifi::before { width: 20px; height: 11px; top: 0; }
+    .wifi::after { width: 10px; height: 6px; top: 6px; }
+
+    .battery {
+      width: 25px;
+      height: 12px;
+      border: 2px solid currentColor;
+      border-radius: 4px;
+      position: relative;
+    }
+
+    .battery::before {
+      content: "";
+      position: absolute;
+      right: -5px;
+      top: 3px;
+      width: 3px;
+      height: 4px;
+      border-radius: 0 2px 2px 0;
+      background: currentColor;
+    }
+
+    .battery::after {
+      content: "";
+      position: absolute;
+      inset: 2px 5px 2px 2px;
+      border-radius: 2px;
+      background: currentColor;
+    }
+
+    .greeting {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 14px;
+      margin: 0 0 22px;
+      padding: 0 0 0 2px;
+    }
+
+    .greeting h2 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.05;
+      letter-spacing: -0.045em;
+      font-weight: 800;
+    }
+
+    .greeting p {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.25;
+      letter-spacing: -0.02em;
+    }
+
+    .online-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      margin-left: 5px;
+      vertical-align: middle;
+      box-shadow: 0 0 0 5px rgba(52, 199, 89, .12);
+    }
+
+    .round-actions {
+      display: flex;
+      gap: 12px;
+      flex: 0 0 auto;
+    }
+
+    .round-button {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.68);
+      border: 1px solid var(--line);
+      display: grid;
+      place-items: center;
+      box-shadow: var(--soft-shadow);
+      backdrop-filter: var(--blur);
+      position: relative;
+      font-size: 0;
+    }
+
+    .round-button.has-dot::after {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ff3b30;
+      position: absolute;
+      top: 7px;
+      right: 8px;
+      border: 2px solid #fff;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--soft-shadow);
+      backdrop-filter: var(--blur);
+    }
+
+    .agent-card {
+      min-height: 128px;
+      padding: 22px 18px;
+      display: grid;
+      grid-template-columns: 92px 1fr auto;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 26px;
+    }
+
+    .orb {
+      width: 86px;
+      height: 86px;
+      border-radius: 50%;
+      position: relative;
+      background: radial-gradient(circle at 50% 52%, #0b1020 0 34%, #171c33 35% 45%, #9eb8ff 46% 100%);
+      box-shadow: 0 18px 36px rgba(93, 123, 255, .20), inset 0 0 24px rgba(255,255,255,.22);
+      animation: orb-breathe 3.8s ease-in-out infinite;
+    }
+
+    .orb.small {
+      width: 64px;
+      height: 64px;
+    }
+
+    .orb.alert {
+      background: radial-gradient(circle at 50% 52%, #16080d 0 34%, #33151b 35% 45%, #ffb3bc 46% 100%);
+      box-shadow: 0 18px 36px rgba(255, 55, 95, .20), inset 0 0 24px rgba(255,255,255,.22);
+    }
+
+    .orb::before, .orb::after {
+      content: "";
+      position: absolute;
+      top: 38%;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #66d8ff;
+      box-shadow: 0 0 13px #66d8ff;
+      animation: eye-pulse 2.2s ease-in-out infinite;
+    }
+
+    .orb::before { left: 31%; }
+    .orb::after { right: 31%; }
+
+    .orb.alert::before, .orb.alert::after {
+      background: #ff7185;
+      box-shadow: 0 0 13px #ff7185;
+    }
+
+    .agent-title {
+      min-width: 0;
+    }
+
+    .agent-title h3 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.1;
+      letter-spacing: -0.035em;
+    }
+
+    .agent-title p {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.15;
+    }
+
+    .online {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      color: #1fa846;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .agent-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .mini-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.64);
+      font-size: 0;
+      color: #111318;
+    }
+
+    .mini-icon::before {
+      content: "";
+      width: 18px;
+      height: 18px;
+      border: 2.5px solid currentColor;
+      border-radius: 50%;
+    }
+
+    .mini-icon.call::before {
+      width: 18px;
+      height: 18px;
+      border-radius: 6px 6px 10px 10px;
+      border-top-color: transparent;
+      transform: rotate(-38deg);
+    }
+
+    .mini-icon.whatsapp { color: #22b14c; }
+    .mini-icon.telegram { color: var(--blue); }
+
+    .mini-icon.telegram::before {
+      width: 0;
+      height: 0;
+      border: 10px solid transparent;
+      border-left-color: currentColor;
+      border-radius: 0;
+      transform: rotate(-20deg);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 1px 14px;
+    }
+
+    .section-title h3 {
+      margin: 0;
+      font-size: 23px;
+      letter-spacing: -0.04em;
+      font-weight: 760;
+    }
+
+    .section-title a {
+      color: var(--blue);
+      text-decoration: none;
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 26px;
+    }
+
+    .metric {
+      min-height: 150px;
+      padding: 18px;
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(135deg, rgba(255,255,255,.9), rgba(255,255,255,.62));
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: var(--soft-shadow);
+    }
+
+    .metric.red { box-shadow: 0 12px 30px rgba(255,55,95,.08); background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(255,244,247,.78)); border-color: rgba(255,55,95,.18); }
+    .metric.blue { box-shadow: 0 12px 30px rgba(0,122,255,.08); background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(240,247,255,.78)); border-color: rgba(0,122,255,.16); }
+    .metric.purple { box-shadow: 0 12px 30px rgba(175,82,222,.08); background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(249,242,255,.80)); border-color: rgba(175,82,222,.15); }
+    .metric.green { box-shadow: 0 12px 30px rgba(52,199,89,.08); background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(242,255,246,.78)); border-color: rgba(52,199,89,.15); }
+    .metric.teal { box-shadow: 0 12px 30px rgba(48,183,189,.08); background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(239,253,254,.78)); border-color: rgba(48,183,189,.15); }
+    .metric.orange { box-shadow: 0 12px 30px rgba(255,138,31,.08); background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(255,248,240,.78)); border-color: rgba(255,138,31,.16); }
+
+    .metric-head {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      margin-bottom: 22px;
+    }
+
+    .metric-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: white;
+      font-size: 0;
+      font-weight: 700;
+    }
+
+    .metric-icon::before {
+      content: "";
+      width: 16px;
+      height: 16px;
+      display: block;
+      background: rgba(255,255,255,.95);
+    }
+
+    .metric-icon.heart::before {
+      width: 18px;
+      height: 18px;
+      transform: rotate(45deg);
+      border-radius: 4px 4px 2px 4px;
+    }
+
+    .metric-icon.drop::before {
+      width: 16px;
+      height: 20px;
+      border-radius: 14px 14px 14px 3px;
+      transform: rotate(45deg);
+    }
+
+    .metric-icon.temp::before {
+      width: 9px;
+      height: 22px;
+      border-radius: 999px;
+    }
+
+    .metric-icon.ecg::before {
+      width: 22px;
+      height: 3px;
+      border-radius: 999px;
+    }
+
+    .metric h4 {
+      margin: 0;
+      font-size: 17px;
+      letter-spacing: -0.025em;
+      font-weight: 620;
+    }
+
+    .metric-value {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .metric-value strong {
+      font-size: 36px;
+      line-height: .9;
+      letter-spacing: -0.05em;
+      font-weight: 760;
+    }
+
+    .metric-value span {
+      font-size: 18px;
+      font-weight: 650;
+    }
+
+    .normal {
+      color: var(--muted);
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .normal i {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .spark {
+      position: absolute;
+      right: 0;
+      bottom: 26px;
+      width: 94px;
+      height: 54px;
+      opacity: .88;
+    }
+
+    .devices {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .device {
+      min-height: 118px;
+      padding: 12px 8px 10px;
+      text-align: center;
+      border-radius: 20px;
+      background: rgba(255,255,255,.86);
+      border: 1px solid var(--line);
+      box-shadow: var(--soft-shadow);
+    }
+
+    .device-visual {
+      width: 42px;
+      height: 46px;
+      margin: 0 auto 6px;
+      border-radius: 10px;
+      background: linear-gradient(155deg, #101720, #4a5565);
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,.12), 0 8px 12px rgba(20,28,38,.14);
+      position: relative;
+    }
+
+    .device-visual.bp { background: linear-gradient(155deg, #e8edf2, #9ba8b4); }
+    .device-visual.glucose { background: linear-gradient(155deg, #d7e2ef, #6c829b); }
+    .device-visual.oxy { border-radius: 14px; background: linear-gradient(155deg, #132334, #4fb6e8); }
+
+    .device-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      margin-right: 4px;
+    }
+
+    .device b {
+      display: block;
+      font-size: 14px;
+      line-height: 1.05;
+      min-height: 30px;
+      margin-bottom: 6px;
+      letter-spacing: -0.02em;
+    }
+
+    .device span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.12;
+    }
+
+    .insight {
+      min-height: 108px;
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 64px 1fr auto;
+      gap: 14px;
+      align-items: center;
+      border-radius: 23px;
+      background: rgba(255,255,255,.82);
+      border: 1px solid rgba(255,55,95,.20);
+      box-shadow: var(--soft-shadow);
+    }
+
+    .alarm {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: rgba(255,55,95,.10);
+      color: var(--red);
+      font-size: 30px;
+    }
+
+    .insight h4 {
+      margin: 0 0 6px;
+      font-size: 17px;
+      letter-spacing: -0.02em;
+    }
+
+    .insight p {
+      margin: 0;
+      color: #2e3541;
+      font-size: 14px;
+      line-height: 1.26;
+    }
+
+    .insight time {
+      align-self: start;
+      color: var(--red);
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .primary-button {
+      height: 45px;
+      padding: 0 18px;
+      border: 0;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #ff4d5d, #e42e3f);
+      color: white;
+      font-size: 15px;
+      font-weight: 700;
+      box-shadow: 0 8px 18px rgba(228, 46, 63, .22);
+    }
+
+    .tabbar {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      height: 84px;
+      border-radius: 28px 28px 34px 34px;
+      background: rgba(255,255,255,.86);
+      border: 1px solid var(--line);
+      box-shadow: 0 -10px 42px rgba(20,28,38,.11);
+      backdrop-filter: var(--blur);
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      align-items: center;
+      padding-bottom: 12px;
+    }
+
+    .tab {
+      display: grid;
+      place-items: center;
+      gap: 4px;
+      color: #4e5765;
+      font-size: 11px;
+      font-weight: 520;
+    }
+
+    .tab .tab-icon {
+      width: 25px;
+      height: 25px;
+      display: block;
+      position: relative;
+      color: currentColor;
+    }
+
+    .tab .tab-icon::before,
+    .tab .tab-icon::after {
+      content: "";
+      position: absolute;
+      display: block;
+    }
+
+    .tab-icon.heart::before {
+      width: 16px;
+      height: 16px;
+      left: 4px;
+      top: 4px;
+      border: 2px solid currentColor;
+      border-top: 0;
+      border-left: 0;
+      transform: rotate(45deg);
+      border-radius: 0 0 5px 0;
+    }
+
+    .tab-icon.devices::before {
+      width: 13px;
+      height: 19px;
+      left: 2px;
+      top: 3px;
+      border: 2px solid currentColor;
+      border-radius: 4px;
+    }
+
+    .tab-icon.devices::after {
+      width: 8px;
+      height: 14px;
+      right: 2px;
+      top: 8px;
+      border: 2px solid currentColor;
+      border-radius: 4px;
+    }
+
+    .tab-icon.bell::before {
+      width: 17px;
+      height: 15px;
+      left: 4px;
+      top: 4px;
+      border: 2px solid currentColor;
+      border-radius: 10px 10px 6px 6px;
+      border-bottom-width: 3px;
+    }
+
+    .tab-icon.user::before {
+      width: 9px;
+      height: 9px;
+      left: 8px;
+      top: 3px;
+      border: 2px solid currentColor;
+      border-radius: 50%;
+    }
+
+    .tab-icon.user::after {
+      width: 18px;
+      height: 10px;
+      left: 3px;
+      bottom: 3px;
+      border: 2px solid currentColor;
+      border-radius: 12px 12px 5px 5px;
+    }
+
+    .round-button.bell::before {
+      content: "";
+      width: 19px;
+      height: 18px;
+      border: 2.5px solid currentColor;
+      border-radius: 12px 12px 7px 7px;
+      border-bottom-width: 3px;
+    }
+
+    .round-button.chat::before {
+      content: "";
+      width: 22px;
+      height: 18px;
+      border: 2.5px solid currentColor;
+      border-radius: 11px;
+    }
+
+    .tab svg {
+      width: 24px;
+      height: 24px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .tab.active { color: var(--blue); }
+
+    .plus {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, #4aa2ff, #0877f2);
+      display: grid;
+      place-items: center;
+      color: white;
+      box-shadow: 0 13px 24px rgba(0,122,255,.28);
+      margin-top: -22px;
+    }
+
+    .plus::before, .plus::after {
+      content: "";
+      position: absolute;
+      width: 24px;
+      height: 3px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    .plus::after { transform: rotate(90deg); }
+
+    .chat-list {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .bubble {
+      max-width: 292px;
+      padding: 13px 15px;
+      border-radius: 20px;
+      font-size: 15px;
+      line-height: 1.28;
+      letter-spacing: -0.015em;
+      box-shadow: var(--soft-shadow);
+    }
+
+    .bubble.user {
+      justify-self: end;
+      color: white;
+      background: var(--blue);
+      border-bottom-right-radius: 7px;
+    }
+
+    .bubble.agent {
+      justify-self: start;
+      background: rgba(255,255,255,.84);
+      border: 1px solid var(--line);
+      border-bottom-left-radius: 7px;
+    }
+
+    .source {
+      display: block;
+      margin-top: 8px;
+      color: var(--blue);
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .upload-card {
+      padding: 18px;
+      margin-bottom: 20px;
+    }
+
+    .upload-card h3 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      letter-spacing: -0.035em;
+    }
+
+    .upload-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.3;
+    }
+
+    .quick-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .ios-button {
+      height: 52px;
+      border: 0;
+      border-radius: 15px;
+      background: var(--blue);
+      color: white;
+      font-size: 16px;
+      font-weight: 650;
+    }
+
+    .ios-button.secondary {
+      color: var(--blue);
+      background: rgba(0,122,255,.10);
+    }
+
+    .critical-card {
+      padding: 20px;
+      text-align: center;
+      background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(255,238,241,.86));
+      border-color: rgba(255,55,95,.24);
+      margin-bottom: 18px;
+    }
+
+    .critical-card .orb {
+      margin: 0 auto 12px;
+    }
+
+    .critical-card h3 {
+      margin: 0;
+      font-size: 30px;
+      line-height: .98;
+      letter-spacing: -0.045em;
+    }
+
+    .critical-card p {
+      margin: 10px auto 0;
+      max-width: 280px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.28;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .timeline-row {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .timeline-row time {
+      color: var(--red);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .timeline-row b {
+      display: block;
+      font-size: 15px;
+      letter-spacing: -0.015em;
+    }
+
+    .timeline-row span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .danger-button {
+      width: 100%;
+      height: 54px;
+      border: 0;
+      border-radius: 17px;
+      background: linear-gradient(180deg, #ff5262, #ed3547);
+      color: #fff;
+      font-size: 17px;
+      font-weight: 700;
+      box-shadow: 0 12px 24px rgba(255,55,95,.24);
+      margin-bottom: 12px;
+    }
+
+    .ghost-button {
+      width: 100%;
+      height: 52px;
+      border: 1px solid var(--line);
+      border-radius: 17px;
+      background: rgba(255,255,255,.82);
+      color: var(--ink);
+      font-size: 16px;
+      font-weight: 650;
+    }
+
+    .patient-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .patient-card {
+      padding: 15px;
+      display: grid;
+      gap: 13px;
+    }
+
+    .patient-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .person {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, #e6f8df, #c6f1b8);
+      color: #1a9d35;
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+      font-weight: 720;
+    }
+
+    .person b {
+      display: block;
+      font-size: 17px;
+      letter-spacing: -0.025em;
+    }
+
+    .person span {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status-pill {
+      height: 30px;
+      display: inline-grid;
+      place-items: center;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: rgba(52,199,89,.11);
+      color: #1fa846;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .status-pill.red {
+      background: rgba(255,55,95,.10);
+      color: var(--red);
+    }
+
+    .patient-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 9px;
+    }
+
+    .patient-stats span {
+      min-height: 48px;
+      border-radius: 15px;
+      background: rgba(239,243,247,.86);
+      padding: 8px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.1;
+    }
+
+    .patient-stats b {
+      display: block;
+      color: var(--ink);
+      font-size: 15px;
+      letter-spacing: -0.02em;
+      margin-bottom: 2px;
+    }
+
+    .home-indicator {
+      position: absolute;
+      bottom: 7px;
+      left: 50%;
+      width: 136px;
+      height: 5px;
+      border-radius: 999px;
+      transform: translateX(-50%);
+      background: #111318;
+      z-index: 30;
+    }
+
+    @keyframes orb-breathe {
+      0%, 100% { transform: scale(1); filter: saturate(1); }
+      50% { transform: scale(1.035); filter: saturate(1.1); }
+    }
+
+    @keyframes eye-pulse {
+      0%, 100% { opacity: .92; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.16); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <header class="board-header">
+      <div>
+        <span class="tag">CareAgent v3</span>
+        <h1>Apple-style AI health guardian</h1>
+        <p>Premium iOS health interface with a soft AI orb mascot, native-feeling cards, connected medical devices, and safety-first escalation.</p>
+      </div>
+    </header>
+
+    <section class="screens" aria-label="CareAgent Apple-style app screens">
+      <article class="phone large" id="apple-dashboard">
+        <div class="screen">
+          <div class="statusbar">
+            <span>9:41</span>
+            <span class="system-icons"><span class="signal"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span>
+          </div>
+          <div class="greeting">
+            <div>
+              <h2>Good Morning, Ramesh</h2>
+              <p>Your AI Health Guardian is active <span class="online-dot"></span></p>
+            </div>
+            <div class="round-actions">
+              <div class="round-button bell has-dot"></div>
+              <div class="round-button chat"></div>
+            </div>
+          </div>
+          <section class="card agent-card">
+            <div class="orb" aria-label="Caro AI orb"></div>
+            <div class="agent-title">
+              <h3>Health Guardian AI</h3>
+              <p>OpenClaw based Agent</p>
+              <div class="online"><span class="online-dot"></span> Online</div>
+            </div>
+            <div class="agent-actions">
+              <div class="mini-icon call"></div>
+              <div class="mini-icon whatsapp"></div>
+              <div class="mini-icon telegram"></div>
+            </div>
+          </section>
+          <div class="section-title"><h3>Health Overview</h3><a href="#">See All</a></div>
+          <div class="metrics">
+            <div class="metric red">
+              <div class="metric-head"><div class="metric-icon heart" style="background:var(--red)"></div><h4>Heart Rate</h4></div>
+              <div class="metric-value"><strong>72</strong><span style="color:var(--red)">BPM</span></div>
+              <div class="normal" style="color:var(--red)"><i></i> Normal</div>
+              <svg class="spark" viewBox="0 0 100 48"><path d="M0 28 L8 22 L15 24 L21 18 L28 31 L36 27 L42 34 L50 20 L58 25 L65 23 L72 10 L81 36 L88 19 L96 26 L100 18" fill="none" stroke="#ff375f" stroke-width="3" stroke-linecap="round"/></svg>
+            </div>
+            <div class="metric blue">
+              <div class="metric-head"><div class="metric-icon drop" style="background:var(--blue)"></div><h4>Blood Pressure</h4></div>
+              <div class="metric-value"><strong>118/76</strong><span style="color:var(--blue)">mmHg</span></div>
+              <div class="normal" style="color:var(--blue)"><i></i> Normal</div>
+              <svg class="spark" viewBox="0 0 100 48"><path d="M0 31 L8 30 L15 24 L21 27 L29 19 L37 32 L44 22 L52 26 L60 21 L67 31 L74 8 L84 33 L92 29 L100 24" fill="none" stroke="#007aff" stroke-width="3" stroke-linecap="round"/></svg>
+            </div>
+            <div class="metric purple">
+              <div class="metric-head"><div class="metric-icon drop" style="background:var(--purple)"></div><h4>SpO2</h4></div>
+              <div class="metric-value"><strong>98</strong><span style="color:var(--purple)">%</span></div>
+              <div class="normal" style="color:var(--purple)"><i></i> Normal</div>
+              <svg class="spark" viewBox="0 0 100 48"><path d="M0 30 L8 24 L15 28 L23 21 L30 30 L38 26 L45 34 L53 27 L60 32 L68 20 L75 25 L82 10 L90 35 L98 26" fill="none" stroke="#af52de" stroke-width="3" stroke-linecap="round"/></svg>
+            </div>
+            <div class="metric green">
+              <div class="metric-head"><div class="metric-icon temp" style="background:var(--green)"></div><h4>Temperature</h4></div>
+              <div class="metric-value"><strong>36.6</strong><span style="color:var(--green)">deg C</span></div>
+              <div class="normal" style="color:var(--green)"><i></i> Normal</div>
+              <svg class="spark" viewBox="0 0 100 48"><path d="M0 26 L8 20 L15 24 L22 22 L31 30 L38 27 L45 33 L54 19 L61 25 L68 22 L75 11 L83 36 L91 25 L100 30" fill="none" stroke="#34c759" stroke-width="3" stroke-linecap="round"/></svg>
+            </div>
+          </div>
+          <nav class="tabbar">
+            <div class="tab active"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab"><span class="tab-icon devices"></span><span>Devices</span></div><div class="tab"><div class="plus"></div></div><div class="tab"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div>
+          </nav>
+          <div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="apple-devices">
+        <div class="screen">
+          <div class="statusbar"><span>9:41</span><span class="system-icons"><span class="signal"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <div class="greeting"><div><h2>Connected Devices</h2><p>Near-universal support through health stores, BLE, APIs, and OCR.</p></div></div>
+          <section class="card agent-card" style="grid-template-columns:78px 1fr;">
+            <div class="orb small"></div>
+            <div class="agent-title"><h3>Caro is syncing live data</h3><p>4 devices connected. Last update 2 minutes ago.</p><div class="online"><span class="online-dot"></span> All sources fresh</div></div>
+          </section>
+          <div class="section-title"><h3>Connected Devices</h3><a href="#">Manage</a></div>
+          <div class="devices">
+            <div class="device"><div class="device-visual"></div><b><span class="device-dot"></span>Apple Watch</b><span>Connected<br>95%</span></div>
+            <div class="device"><div class="device-visual bp"></div><b><span class="device-dot"></span>BP Monitor</b><span>Connected<br>85%</span></div>
+            <div class="device"><div class="device-visual glucose"></div><b><span class="device-dot"></span>Glucometer</b><span>Connected<br>90%</span></div>
+            <div class="device"><div class="device-visual oxy"></div><b><span class="device-dot"></span>Pulse Ox</b><span>Connected<br>88%</span></div>
+          </div>
+          <div class="section-title"><h3>Connection Methods</h3><a href="#">Add</a></div>
+          <div class="metrics" style="grid-template-columns:1fr;">
+            <div class="metric blue" style="min-height:112px;"><div class="metric-head"><div class="metric-icon" style="background:var(--blue)">OS</div><h4>HealthKit / Health Connect</h4></div><div class="normal" style="color:var(--blue)"><i></i> Smart watches, bands, rings, health apps</div></div>
+            <div class="metric green" style="min-height:112px;"><div class="metric-head"><div class="metric-icon" style="background:var(--green)">BLE</div><h4>Medical Bluetooth</h4></div><div class="normal" style="color:var(--green)"><i></i> BP, glucose, SpO2, temperature, ECG</div></div>
+            <div class="metric orange" style="min-height:112px;"><div class="metric-head"><div class="metric-icon" style="background:var(--orange)">OCR</div><h4>Photo fallback</h4></div><div class="normal" style="color:var(--orange)"><i></i> Works for unsupported devices and reports</div></div>
+          </div>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab active"><span class="tab-icon devices"></span><span>Devices</span></div><div class="tab"><div class="plus"></div></div><div class="tab"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div></nav>
+          <div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="apple-chat">
+        <div class="screen">
+          <div class="statusbar"><span>9:41</span><span class="system-icons"><span class="signal"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <div class="greeting"><div><h2>Ask Caro</h2><p>Reports, medicines, devices, and care team actions.</p></div><div class="orb small"></div></div>
+          <section class="card upload-card">
+            <h3>Prescription converted to schedule</h3>
+            <p>Review extracted medicines before reminders or caretaker updates start.</p>
+          </section>
+          <div class="chat-list">
+            <div class="bubble user">What medicine do I take after breakfast?</div>
+            <div class="bubble agent">Metformin 500 mg, 1 tablet after breakfast.<span class="source">Source: reviewed prescription, Apr 30</span></div>
+            <div class="bubble user">Send today's update to my son.</div>
+            <div class="bubble agent">I can send Amit a WhatsApp summary after your confirmation.</div>
+          </div>
+          <div class="section-title"><h3>Quick Actions</h3><a href="#">Safe</a></div>
+          <div class="quick-actions">
+            <button class="ios-button">Upload Report</button>
+            <button class="ios-button secondary">Ask Vitals</button>
+          </div>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab"><span class="tab-icon devices"></span><span>Devices</span></div><div class="tab active"><div class="plus"></div></div><div class="tab"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div></nav>
+          <div class="home-indicator"></div>
+        </div>
+      </article>
+
+      <article class="phone" id="apple-alerts">
+        <div class="screen">
+          <div class="statusbar"><span>11:42</span><span class="system-icons"><span class="signal"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>
+          <div class="greeting"><div><h2>Emergency Protocol</h2><p>Caro is acting with patient authorization.</p></div><div class="round-button bell has-dot"></div></div>
+          <section class="card critical-card">
+            <div class="orb alert"></div>
+            <h3>Heart rate dropped fast</h3>
+            <p>38 BPM from Watch BLE. Confidence 94%. Emergency consent is active.</p>
+          </section>
+          <div class="timeline">
+            <div class="timeline-row"><time>11:42</time><div><b>Anomaly detected</b><span>72 to 38 BPM within 40 seconds.</span></div></div>
+            <div class="timeline-row"><time>11:42</time><div><b>Policy approved</b><span>Location sharing and calls are permitted.</span></div></div>
+            <div class="timeline-row"><time>11:43</time><div><b>Calls initiated</b><span>Caretaker, doctor, and ambulance contact.</span></div></div>
+            <div class="timeline-row"><time>11:43</time><div><b>AI disclosure included</b><span>"This is CareAgent calling with authorization."</span></div></div>
+          </div>
+          <button class="danger-button">Call Primary Caretaker</button>
+          <button class="ghost-button">Cancel False Alarm</button>
+          <nav class="tabbar"><div class="tab"><span class="tab-icon heart"></span><span>Dashboard</span></div><div class="tab"><span class="tab-icon devices"></span><span>Devices</span></div><div class="tab"><div class="plus"></div></div><div class="tab active"><span class="tab-icon bell"></span><span>Alerts</span></div><div class="tab"><span class="tab-icon user"></span><span>Profile</span></div></nav>
+          <div class="home-indicator"></div>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>
