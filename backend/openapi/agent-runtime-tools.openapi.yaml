@@ -1,0 +1,1052 @@
+openapi: 3.1.0
+info:
+  title: CareAgent Runtime Tool Server API
+  version: 0.1.0
+  description: >
+    Runtime-facing tool contract for CareAgent agents. These endpoints are the
+    only backend tools that OpenClaw, NemoClaw, PicoClaw, LangGraph, OpenAI
+    Agents SDK, Semantic Kernel, CrewAI, or future adapters may call. Every
+    endpoint must recompute authorization, consent, policy, idempotency, and
+    audit server-side.
+servers:
+  - url: /agent-tools/v1
+security:
+  - agentRuntimeToken: []
+tags:
+  - name: RuntimeTools
+    description: Patient-scoped tools exposed to the agent runtime.
+paths:
+  /tools/get_patient_profile:
+    post:
+      tags: [RuntimeTools]
+      operationId: getPatientProfileTool
+      summary: Retrieve selected patient profile fields.
+      x-careagent-action-class: read_only
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetPatientProfileRequest"
+      responses:
+        "200":
+          description: Profile fields or a safe denial.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetPatientProfileResponse"
+  /tools/get_recent_vitals:
+    post:
+      tags: [RuntimeTools]
+      operationId: getRecentVitalsTool
+      summary: Retrieve recent patient observations with source and freshness.
+      x-careagent-action-class: read_only
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetRecentVitalsRequest"
+      responses:
+        "200":
+          description: Recent readings or a safe denial.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetRecentVitalsResponse"
+  /tools/get_device_status:
+    post:
+      tags: [RuntimeTools]
+      operationId: getDeviceStatusTool
+      summary: Retrieve connected-device status and supported metrics.
+      x-careagent-action-class: read_only
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetDeviceStatusRequest"
+      responses:
+        "200":
+          description: Device status or a safe denial.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetDeviceStatusResponse"
+  /tools/get_medicine_schedule:
+    post:
+      tags: [RuntimeTools]
+      operationId: getMedicineScheduleTool
+      summary: Retrieve reviewed medicine schedules and dose events.
+      x-careagent-action-class: read_only
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetMedicineScheduleRequest"
+      responses:
+        "200":
+          description: Active medicine schedule or a safe denial.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetMedicineScheduleResponse"
+  /tools/log_medicine_taken:
+    post:
+      tags: [RuntimeTools]
+      operationId: logMedicineTakenTool
+      summary: Record a medicine dose event after clear intent.
+      x-careagent-action-class: low_risk_write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogMedicineTakenRequest"
+      responses:
+        "200":
+          description: Recorded dose event or a safe denial.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogMedicineTakenResponse"
+  /tools/search_medical_documents:
+    post:
+      tags: [RuntimeTools]
+      operationId: searchMedicalDocumentsTool
+      summary: Retrieve reviewed facts and source snippets from medical documents.
+      x-careagent-action-class: read_only
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchMedicalDocumentsRequest"
+      responses:
+        "200":
+          description: Document facts or a safe denial.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchMedicalDocumentsResponse"
+  /tools/create_alert:
+    post:
+      tags: [RuntimeTools]
+      operationId: createAlertTool
+      summary: Create an alert through backend policy.
+      x-careagent-action-class: high_risk_write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAlertRequest"
+      responses:
+        "200":
+          description: Alert result or policy denial.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateAlertResponse"
+  /tools/request_patient_confirmation:
+    post:
+      tags: [RuntimeTools]
+      operationId: requestPatientConfirmationTool
+      summary: Create a patient or caretaker confirmation/check-in request.
+      x-careagent-action-class: medium_risk_write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestPatientConfirmationRequest"
+      responses:
+        "200":
+          description: Confirmation request or policy denial.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestPatientConfirmationResponse"
+  /tools/send_channel_message:
+    post:
+      tags: [RuntimeTools]
+      operationId: sendChannelMessageTool
+      summary: Send a policy-approved channel message.
+      x-careagent-action-class: medium_risk_communication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendChannelMessageRequest"
+      responses:
+        "200":
+          description: Message dispatch result or safe denial.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendChannelMessageResponse"
+  /tools/place_voice_call:
+    post:
+      tags: [RuntimeTools]
+      operationId: placeVoiceCallTool
+      summary: Place a policy-approved AI-disclosed voice call.
+      x-careagent-action-class: critical_action
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaceVoiceCallRequest"
+      responses:
+        "200":
+          description: Voice call result or safe denial.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceVoiceCallResponse"
+  /tools/start_escalation_protocol:
+    post:
+      tags: [RuntimeTools]
+      operationId: startEscalationProtocolTool
+      summary: Start or resume a policy-approved escalation run.
+      x-careagent-action-class: critical_action
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartEscalationProtocolRequest"
+      responses:
+        "200":
+          description: Escalation run result or policy denial.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StartEscalationProtocolResponse"
+  /tools/book_appointment_request:
+    post:
+      tags: [RuntimeTools]
+      operationId: bookAppointmentRequestTool
+      summary: Create a request for a doctor appointment or test booking.
+      x-careagent-action-class: medium_risk_write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookAppointmentRequestRequest"
+      responses:
+        "200":
+          description: Appointment request result or safe denial.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookAppointmentRequestResponse"
+components:
+  securitySchemes:
+    agentRuntimeToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Short-lived runtime token scoped to one runtime adapter and environment.
+  schemas:
+    ToolEnvelope:
+      type: object
+      required:
+        - request_id
+        - conversation_id
+        - patient_id
+        - actor
+        - authorization
+        - reason
+        - input
+      properties:
+        request_id:
+          type: string
+        conversation_id:
+          type: string
+        patient_id:
+          type: string
+        actor:
+          $ref: "#/components/schemas/ActorContext"
+        authorization:
+          $ref: "#/components/schemas/AuthorizationContext"
+        reason:
+          type: string
+          enum:
+            - answer_user_question
+            - patient_check_in
+            - medicine_confirmation
+            - caretaker_summary
+            - document_qa
+            - urgent_alert
+            - emergency_escalation
+            - appointment_request
+            - simulation_test
+        idempotency_key:
+          type:
+            - string
+            - "null"
+          description: Required for write, communication, call, and escalation tools.
+    ActorContext:
+      type: object
+      required: [actor_id, role, channel, verified]
+      properties:
+        actor_id:
+          type: string
+        role:
+          type: string
+          enum: [patient, caretaker, nurse, doctor, admin, system]
+        account_id:
+          type:
+            - string
+            - "null"
+        channel:
+          type: string
+          enum: [app, whatsapp, telegram, voice, backend_job]
+        channel_subject:
+          type:
+            - string
+            - "null"
+          description: Provider subject, phone hash, chat ID hash, or call SID hash.
+        verified:
+          type: boolean
+    AuthorizationContext:
+      type: object
+      required: [scope, consent_grant_ids]
+      properties:
+        scope:
+          type: array
+          items:
+            type: string
+        consent_grant_ids:
+          type: array
+          items:
+            type: string
+    ToolResponse:
+      type: object
+      required: [status, audit_log_id]
+      properties:
+        status:
+          type: string
+          enum: [ok, denied, needs_confirmation, unavailable, error]
+        audit_log_id:
+          type: string
+        policy_decision_id:
+          type:
+            - string
+            - "null"
+        safe_user_message:
+          type:
+            - string
+            - "null"
+        error_code:
+          type:
+            - string
+            - "null"
+          enum:
+            - null
+            - unauthenticated
+            - patient_access_denied
+            - consent_missing
+            - policy_denied
+            - confirmation_required
+            - not_found
+            - stale_data
+            - low_confidence_data
+            - rate_limited
+            - provider_unavailable
+            - idempotency_conflict
+            - unsafe_request
+        result:
+          type: object
+          additionalProperties: true
+    GetPatientProfileRequest:
+      allOf:
+        - $ref: "#/components/schemas/ToolEnvelope"
+        - type: object
+          properties:
+            input:
+              type: object
+              required: [fields]
+              properties:
+                fields:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - full_name
+                      - age
+                      - conditions
+                      - allergies
+                      - primary_language
+                      - emergency_location_notes
+                include_care_team_summary:
+                  type: boolean
+                  default: false
+    GetPatientProfileResponse:
+      allOf:
+        - $ref: "#/components/schemas/ToolResponse"
+        - type: object
+          properties:
+            result:
+              type: object
+              properties:
+                patient:
+                  $ref: "#/components/schemas/PatientProfileSummary"
+    PatientProfileSummary:
+      type: object
+      properties:
+        patient_id:
+          type: string
+        full_name:
+          type: string
+        age:
+          type:
+            - integer
+            - "null"
+        primary_language:
+          type:
+            - string
+            - "null"
+        conditions:
+          type: array
+          items:
+            type: string
+        allergies:
+          type: array
+          items:
+            type: string
+        source:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    GetRecentVitalsRequest:
+      allOf:
+        - $ref: "#/components/schemas/ToolEnvelope"
+        - type: object
+          properties:
+            input:
+              type: object
+              required: [metrics, window]
+              properties:
+                metrics:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - heart_rate
+                      - blood_pressure_systolic
+                      - blood_pressure_diastolic
+                      - spo2
+                      - glucose
+                      - temperature
+                      - respiratory_rate
+                      - weight
+                      - sleep_minutes
+                      - steps
+                      - fall_detected
+                window:
+                  $ref: "#/components/schemas/TimeWindow"
+                max_points_per_metric:
+                  type: integer
+                  minimum: 1
+                  maximum: 200
+                  default: 24
+                include_trend_summary:
+                  type: boolean
+                  default: true
+    GetRecentVitalsResponse:
+      allOf:
+        - $ref: "#/components/schemas/ToolResponse"
+        - type: object
+          properties:
+            result:
+              type: object
+              properties:
+                readings:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/VitalReading"
+                trend_summary:
+                  type:
+                    - string
+                    - "null"
+    TimeWindow:
+      type: object
+      required: [amount, unit]
+      properties:
+        amount:
+          type: integer
+          minimum: 1
+        unit:
+          type: string
+          enum: [minutes, hours, days]
+    VitalReading:
+      type: object
+      required: [metric_code, value, unit, observed_at, source, freshness]
+      properties:
+        metric_code:
+          type: string
+        value:
+          type: number
+        unit:
+          type: string
+        observed_at:
+          type: string
+          format: date-time
+        source:
+          type: string
+        source_type:
+          type: string
+        reliability_tier:
+          type: string
+          enum: [clinical, health_store, vendor_api, ble_medical, manual, ocr]
+        freshness:
+          type: string
+          enum: [live, recent, stale, unknown]
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+    GetDeviceStatusRequest:
+      allOf:
+        - $ref: "#/components/schemas/ToolEnvelope"
+        - type: object
+          properties:
+            input:
+              type: object
+              properties:
+                device_ids:
+                  type: array
+                  items:
+                    type: string
+                include_supported_metrics:
+                  type: boolean
+                  default: true
+    GetDeviceStatusResponse:
+      allOf:
+        - $ref: "#/components/schemas/ToolResponse"
+        - type: object
+          properties:
+            result:
+              type: object
+              properties:
+                devices:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/DeviceStatus"
+    DeviceStatus:
+      type: object
+      properties:
+        device_id:
+          type: string
+        display_name:
+          type: string
+        category:
+          type: string
+        status:
+          type: string
+          enum: [connected, disconnected, stale, pairing_required, unknown]
+        last_seen_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+        battery_level:
+          type:
+            - integer
+            - "null"
+          minimum: 0
+          maximum: 100
+        supported_metrics:
+          type: array
+          items:
+            type: string
+        freshness:
+          type: string
+    GetMedicineScheduleRequest:
+      allOf:
+        - $ref: "#/components/schemas/ToolEnvelope"
+        - type: object
+          properties:
+            input:
+              type: object
+              required: [date]
+              properties:
+                date:
+                  type: string
+                  format: date
+                include_history_days:
+                  type: integer
+                  minimum: 0
+                  maximum: 30
+                  default: 7
+    GetMedicineScheduleResponse:
+      allOf:
+        - $ref: "#/components/schemas/ToolResponse"
+        - type: object
+          properties:
+            result:
+              type: object
+              properties:
+                schedules:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/MedicineSchedule"
+                today_events:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/MedicineDoseEvent"
+                adherence_summary:
+                  type:
+                    - string
+                    - "null"
+    MedicineSchedule:
+      type: object
+      properties:
+        schedule_id:
+          type: string
+        medicine_id:
+          type: string
+        name:
+          type: string
+        strength:
+          type:
+            - string
+            - "null"
+        dose:
+          type:
+            - string
+            - "null"
+        route:
+          type:
+            - string
+            - "null"
+        scheduled_times:
+          type: array
+          items:
+            type: string
+            pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+        review_status:
+          type: string
+          enum: [reviewed, unreviewed, disputed]
+        source_document_id:
+          type:
+            - string
+            - "null"
+    MedicineDoseEvent:
+      type: object
+      properties:
+        dose_event_id:
+          type: string
+        schedule_id:
+          type: string
+        scheduled_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [scheduled, taken, skipped, snoozed, missed]
+        recorded_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+    LogMedicineTakenRequest:
+      allOf:
+        - $ref: "#/components/schemas/ToolEnvelope"
+        - type: object
+          required: [idempotency_key]
+          properties:
+            input:
+              type: object
+              required: [schedule_id, taken_at, source_channel, confirmation_text]
+              properties:
+                schedule_id:
+                  type: string
+                dose_event_id:
+                  type:
+                    - string
+                    - "null"
+                taken_at:
+                  type: string
+                  format: date-time
+                source_channel:
+                  type: string
+                  enum: [app, whatsapp, telegram, voice, backend_job]
+                confirmation_text:
+                  type: string
+    LogMedicineTakenResponse:
+      allOf:
+        - $ref: "#/components/schemas/ToolResponse"
+        - type: object
+          properties:
+            result:
+              type: object
+              properties:
+                dose_event:
+                  $ref: "#/components/schemas/MedicineDoseEvent"
+    SearchMedicalDocumentsRequest:
+      allOf:
+        - $ref: "#/components/schemas/ToolEnvelope"
+        - type: object
+          properties:
+            input:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                  maxLength: 500
+                document_types:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - prescription
+                      - lab_report
+                      - discharge_summary
+                      - doctor_note
+                      - medicine_photo
+                      - imaging_report
+                      - other
+                max_results:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                  default: 5
+                include_low_confidence:
+                  type: boolean
+                  default: false
+    SearchMedicalDocumentsResponse:
+      allOf:
+        - $ref: "#/components/schemas/ToolResponse"
+        - type: object
+          properties:
+            result:
+              type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/DocumentFact"
+    DocumentFact:
+      type: object
+      required: [document_id, document_name, fact_id, confidence, review_status]
+      properties:
+        document_id:
+          type: string
+        document_name:
+          type: string
+        document_date:
+          type:
+            - string
+            - "null"
+          format: date
+        fact_id:
+          type: string
+        label:
+          type: string
+        value:
+          type:
+            - string
+            - "null"
+        unit:
+          type:
+            - string
+            - "null"
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        review_status:
+          type: string
+          enum: [reviewed, unreviewed, disputed]
+        source_page:
+          type:
+            - integer
+            - "null"
+        source_snippet_id:
+          type:
+            - string
+            - "null"
+    CreateAlertRequest:
+      allOf:
+        - $ref: "#/components/schemas/ToolEnvelope"
+        - type: object
+          required: [idempotency_key]
+          properties:
+            input:
+              type: object
+              required: [severity, reason, evidence]
+              properties:
+                severity:
+                  type: string
+                  enum: [informational, low, moderate, high, critical]
+                reason:
+                  type: string
+                evidence:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/RiskEvidence"
+                requested_channels:
+                  type: array
+                  items:
+                    type: string
+                    enum: [app, push, whatsapp, telegram, sms, voice, email]
+    CreateAlertResponse:
+      allOf:
+        - $ref: "#/components/schemas/ToolResponse"
+        - type: object
+          properties:
+            result:
+              type: object
+              properties:
+                alert_id:
+                  type: string
+                severity:
+                  type: string
+                status:
+                  type: string
+    RiskEvidence:
+      type: object
+      required: [type, summary]
+      properties:
+        type:
+          type: string
+          enum: [vital, symptom, device, medicine, document, risk_event]
+        summary:
+          type: string
+        source_id:
+          type:
+            - string
+            - "null"
+        observed_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+    RequestPatientConfirmationRequest:
+      allOf:
+        - $ref: "#/components/schemas/ToolEnvelope"
+        - type: object
+          required: [idempotency_key]
+          properties:
+            input:
+              type: object
+              required: [prompt, confirmation_type, timeout_seconds]
+              properties:
+                prompt:
+                  type: string
+                  maxLength: 800
+                confirmation_type:
+                  type: string
+                  enum: [yes_no, dose_taken, symptom_check, patient_selection, action_confirmation]
+                timeout_seconds:
+                  type: integer
+                  minimum: 30
+                  maximum: 86400
+                allowed_responses:
+                  type: array
+                  items:
+                    type: string
+                risk_event_id:
+                  type:
+                    - string
+                    - "null"
+    RequestPatientConfirmationResponse:
+      allOf:
+        - $ref: "#/components/schemas/ToolResponse"
+        - type: object
+          properties:
+            result:
+              type: object
+              properties:
+                confirmation_id:
+                  type: string
+                expires_at:
+                  type: string
+                  format: date-time
+                status:
+                  type: string
+                  enum: [pending, delivered, failed]
+    SendChannelMessageRequest:
+      allOf:
+        - $ref: "#/components/schemas/ToolEnvelope"
+        - type: object
+          required: [idempotency_key]
+          properties:
+            input:
+              type: object
+              required: [contact_id, channel, template_id, variables, ai_disclosure_included]
+              properties:
+                contact_id:
+                  type: string
+                channel:
+                  type: string
+                  enum: [app, push, whatsapp, telegram, sms, email]
+                template_id:
+                  type: string
+                variables:
+                  type: object
+                  additionalProperties:
+                    type:
+                      - string
+                      - number
+                      - boolean
+                      - "null"
+                ai_disclosure_included:
+                  type: boolean
+                risk_event_id:
+                  type:
+                    - string
+                    - "null"
+    SendChannelMessageResponse:
+      allOf:
+        - $ref: "#/components/schemas/ToolResponse"
+        - type: object
+          properties:
+            result:
+              type: object
+              properties:
+                message_id:
+                  type: string
+                provider_message_id:
+                  type:
+                    - string
+                    - "null"
+                delivery_status:
+                  type: string
+                  enum: [queued, sent, delivered, failed]
+    PlaceVoiceCallRequest:
+      allOf:
+        - $ref: "#/components/schemas/ToolEnvelope"
+        - type: object
+          required: [idempotency_key]
+          properties:
+            input:
+              type: object
+              required: [contact_id, script_template_id, variables, ai_disclosure_included]
+              properties:
+                contact_id:
+                  type: string
+                script_template_id:
+                  type: string
+                variables:
+                  type: object
+                  additionalProperties:
+                    type:
+                      - string
+                      - number
+                      - boolean
+                      - "null"
+                ai_disclosure_included:
+                  type: boolean
+                risk_event_id:
+                  type:
+                    - string
+                    - "null"
+                escalation_run_id:
+                  type:
+                    - string
+                    - "null"
+    PlaceVoiceCallResponse:
+      allOf:
+        - $ref: "#/components/schemas/ToolResponse"
+        - type: object
+          properties:
+            result:
+              type: object
+              properties:
+                call_id:
+                  type: string
+                provider_call_id:
+                  type:
+                    - string
+                    - "null"
+                call_status:
+                  type: string
+                  enum: [queued, ringing, answered, acknowledged, failed]
+    StartEscalationProtocolRequest:
+      allOf:
+        - $ref: "#/components/schemas/ToolEnvelope"
+        - type: object
+          required: [idempotency_key]
+          properties:
+            input:
+              type: object
+              required: [risk_event_id]
+              properties:
+                risk_event_id:
+                  type: string
+                simulation_mode:
+                  type: boolean
+                  default: false
+                requested_start_reason:
+                  type: string
+                  enum: [policy_approved_critical_event, manual_sos, patient_requested, caretaker_requested, simulation_test]
+    StartEscalationProtocolResponse:
+      allOf:
+        - $ref: "#/components/schemas/ToolResponse"
+        - type: object
+          properties:
+            result:
+              type: object
+              properties:
+                escalation_run_id:
+                  type: string
+                status:
+                  type: string
+                  enum: [started, already_running, completed, denied]
+                next_action_summary:
+                  type:
+                    - string
+                    - "null"
+    BookAppointmentRequestRequest:
+      allOf:
+        - $ref: "#/components/schemas/ToolEnvelope"
+        - type: object
+          required: [idempotency_key]
+          properties:
+            input:
+              type: object
+              required: [provider_ref, reason, preferred_time_window, confirmation_id]
+              properties:
+                provider_ref:
+                  type: string
+                  description: CareAgent provider/contact reference, not raw provider credentials.
+                reason:
+                  type: string
+                  maxLength: 500
+                preferred_time_window:
+                  type: object
+                  required: [start_at, end_at]
+                  properties:
+                    start_at:
+                      type: string
+                      format: date-time
+                    end_at:
+                      type: string
+                      format: date-time
+                share_summary:
+                  type: boolean
+                  default: false
+                confirmation_id:
+                  type: string
+    BookAppointmentRequestResponse:
+      allOf:
+        - $ref: "#/components/schemas/ToolResponse"
+        - type: object
+          properties:
+            result:
+              type: object
+              properties:
+                appointment_request_id:
+                  type: string
+                status:
+                  type: string
+                  enum: [requested, awaiting_provider, denied, failed]

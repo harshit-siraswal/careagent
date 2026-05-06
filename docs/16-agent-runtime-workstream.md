@@ -71,6 +71,7 @@ When the backend repo is created, add these modules:
 - `backend/app/agent/tools/server.py`: typed tool dispatcher and policy middleware.
 - `backend/app/agent/tools/schemas.py`: tool input/output schemas.
 - `backend/app/agent/policies/tool_policy.py`: action classes, policy checks, confirmation rules.
+- `backend/openapi/agent-runtime-tools.openapi.yaml`: HTTP contract for the runtime-facing tool server.
 - `backend/app/agent/prompts/careagent_system_v1.md`: versioned system prompt.
 - `backend/app/agent/prompts/document_qa_v1.md`: source-grounded document QA prompt.
 - `backend/app/agent/prompts/alert_message_v1.md`: urgent alert message prompt.
@@ -199,24 +200,30 @@ Adapter invariants:
 Default MVP path:
 
 - OpenClaw for channel gateway and prototype agent runtime.
-- NemoClaw for production hardening if the deployment needs OpenShell sandboxing, network policy, lifecycle controls, and a versioned blueprint around OpenClaw.
+- NemoClaw for production-hardening evaluation if the deployment needs OpenShell sandboxing, network policy, lifecycle controls, and a versioned blueprint around OpenClaw. As of the May 6, 2026 source check, NVIDIA's latest NemoClaw docs label it alpha software and say not to use it in production, so it cannot be the production runtime until that status changes and security review approves it.
 - LangGraph for deterministic long-running risk and escalation workflows if those workflows grow beyond simple backend state machines.
+- Temporal or an equivalent workflow engine for production escalation durability if the backend needs crash-proof retries, signals, and long-running state outside the agent runtime. This is not a chat runtime, but it is a stronger fit than any LLM agent for executing emergency action state machines.
 
 Candidate comparison:
 
 | Runtime | Use in CareAgent | Strength | Constraint |
 | --- | --- | --- | --- |
 | OpenClaw | Prototype channel gateway and agent runner | Self-hosted multi-channel gateway with tool, session, memory, and channel routing support | Personal assistant defaults need strict tool allowlists, PHI redaction, and backend policy wrapping |
-| NVIDIA NemoClaw | Production wrapper for sandboxed OpenClaw | Adds OpenShell containers, onboarding, lifecycle management, and network policy controls | Still needs product-level healthcare policy, audit, consent, and PHI controls |
+| NVIDIA NemoClaw | Sandboxed OpenClaw evaluation track | Adds OpenShell containers, onboarding, lifecycle management, and network policy controls | Current latest docs mark it alpha and not for production; still needs CareAgent policy, audit, consent, and PHI controls |
 | PicoClaw | Low-resource edge experiment | Go implementation designed for very small devices and Android support | Project warns it is early rapid development and should not be deployed to production before v1.0 |
 | LangGraph | Durable workflow orchestration | Durable execution, persistence, human-in-the-loop, and long-running stateful workflows | Does not provide WhatsApp/Telegram gateway by itself |
 | OpenAI Agents SDK | Internal tool workflows, voice prototypes, eval harnesses | Code-first Python/TypeScript agents, tool control, guardrails, traces, human review patterns | Less channel-gateway focused; use behind CareAgent adapter if OpenAI stack is chosen |
+| Semantic Kernel Agent Framework | Enterprise Microsoft/.NET or Azure-heavy deployments | Agent abstractions, multi-agent collaboration, orchestration packages, .NET/Python/Java ecosystem | More platform fit than channel fit; not the first choice for a FastAPI-first MVP unless enterprise buyers require it |
+| CrewAI | Non-critical back-office agent teams | Crews for autonomous specialists, Flows for structured state, tools, observability, HITL patterns | Too autonomous/task-team oriented for patient-facing safety-critical actions; keep it away from escalation execution |
+| Temporal | Production escalation workflow engine | Durable, resumable workflows for mission-critical processes across crashes and outages | Not an agent framework or Claw-compatible channel gateway; use under the adapter/control plane, not as the conversational runtime |
 
 Selection rule:
 
 - Use OpenClaw/NemoClaw where channel routing is the main problem.
-- Use deterministic backend state machines or LangGraph where escalation durability is the main problem.
+- Use deterministic backend state machines, Temporal, or LangGraph where escalation durability is the main problem.
 - Use OpenAI Agents SDK where tool execution, voice, tracing, and evals are the main problem.
+- Use Semantic Kernel only when Microsoft ecosystem alignment is more important than channel gateway speed.
+- Use CrewAI only for offline research, QA synthesis, or operations workflows that cannot message, call, or escalate patients directly.
 - Do not let any candidate own policy approval or emergency decisions.
 
 ## 6. CareAgent System Prompt
@@ -317,6 +324,8 @@ Error codes:
 - `unsafe_request`
 
 ## 8. Tool Schemas
+
+The implementation-facing HTTP contract is captured in `backend/openapi/agent-runtime-tools.openapi.yaml`. The examples below are the human-readable prompt and policy version of the same tool surface.
 
 ### 8.1 get_patient_profile
 
@@ -1285,3 +1294,6 @@ External official sources checked on May 6, 2026:
 - LangGraph overview: https://docs.langchain.com/oss/python/langgraph/overview
 - OpenAI Agents SDK guide: https://developers.openai.com/api/docs/guides/agents
 - OpenAI Agents SDK guardrails: https://openai.github.io/openai-agents-python/guardrails/
+- Microsoft Semantic Kernel Agent Framework: https://learn.microsoft.com/en-us/semantic-kernel/frameworks/agent/
+- CrewAI introduction: https://docs.crewai.com/en/introduction
+- Temporal docs: https://docs.temporal.io/
