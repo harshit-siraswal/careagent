@@ -1,6 +1,54 @@
 {
-  "version": 1,
+  "version": 2,
   "provider_mode": "mock_simulator",
+  "simulation_guards": {
+    "block_production_providers": true,
+    "require_policy_decision": true,
+    "require_verified_channel_links_for_medical_commands": true,
+    "require_ai_disclosure_for_voice": true,
+    "public_emergency_numbers_simulated_only": true,
+    "whatsapp_web_adapter_prototype_only": true
+  },
+  "default_preconditions": {
+    "patient_consents": {
+      "health_data_access": "active",
+      "caretaker_access": "active",
+      "whatsapp_communication": "active",
+      "telegram_communication": "active",
+      "push_notifications": "active",
+      "voice_calls": "active",
+      "location_sharing": "active",
+      "emergency_escalation": "active"
+    },
+    "channel_links": {
+      "push": "verified",
+      "whatsapp": "verified",
+      "telegram": "verified",
+      "sms": "verified",
+      "voice": "verified"
+    },
+    "templates": {
+      "urgent_vitals_alert_v1": "approved",
+      "critical_escalation_caretaker_v1": "approved",
+      "doctor_escalation_summary_v1": "approved",
+      "emergency_services_summary_v1": "approved",
+      "emergency_simulation_notice_v1": "approved"
+    },
+    "call_scripts": {
+      "critical_caretaker_call_v1": {
+        "approval_status": "approved",
+        "ai_disclosure_present": true
+      },
+      "doctor_escalation_call_v1": {
+        "approval_status": "approved",
+        "ai_disclosure_present": true
+      },
+      "ambulance_contact_call_v1": {
+        "approval_status": "approved",
+        "ai_disclosure_present": true
+      }
+    }
+  },
   "cases": [
     {
       "key": "critical_hr_primary_ack",
@@ -176,6 +224,201 @@
       "expected": {
         "production_provider_invocations": 0,
         "simulated_emergency_call_created": true
+      }
+    },
+    {
+      "key": "business_initiated_whatsapp_requires_template",
+      "risk_event": {
+        "severity": "high",
+        "reason": "Business-initiated urgent alert outside WhatsApp service window"
+      },
+      "dispatch_request_overrides": {
+        "channel": "whatsapp",
+        "business_initiated": true,
+        "inside_service_window": false,
+        "template_id": null,
+        "free_form_body_requested": true
+      },
+      "expected": {
+        "free_form_dispatch_status": "policy_denied",
+        "denial_reason": "approved_template_required",
+        "fallback_template_id": "urgent_vitals_alert_v1",
+        "whatsapp_template_path_selected": true
+      }
+    },
+    {
+      "key": "prototype_whatsapp_web_blocked_production",
+      "risk_event": {
+        "severity": "critical",
+        "reason": "Agent requested prototype WhatsApp Web adapter in production"
+      },
+      "environment": "production",
+      "provider_overrides": {
+        "whatsapp": "prototype_whatsapp_web"
+      },
+      "expected": {
+        "whatsapp_action_status": "skipped",
+        "skip_reason": "production_provider_required",
+        "fallback_selected": true,
+        "prototype_provider_invocations": 0
+      }
+    },
+    {
+      "key": "voice_script_missing_ai_disclosure",
+      "risk_event": {
+        "severity": "critical",
+        "reason": "Critical alert with invalid voice script"
+      },
+      "call_script_overrides": {
+        "critical_caretaker_call_v1": {
+          "approval_status": "approved",
+          "ai_disclosure_present": false
+        }
+      },
+      "expected": {
+        "voice_dispatch_status": "policy_denied",
+        "denial_reason": "ai_disclosure_required",
+        "provider_call_id_created": false,
+        "fallback_selected": true
+      }
+    },
+    {
+      "key": "delivery_receipts_out_of_order",
+      "risk_event": {
+        "severity": "high",
+        "reason": "Receipt ordering test for urgent vitals alert"
+      },
+      "provider_behaviors": [
+        {
+          "step_order": 1,
+          "channel": "whatsapp",
+          "behavior": "deliver",
+          "delay_seconds": 4,
+          "provider_event_id": "evt_read_first",
+          "normalized_status": "read"
+        },
+        {
+          "step_order": 1,
+          "channel": "whatsapp",
+          "behavior": "deliver",
+          "delay_seconds": 6,
+          "provider_event_id": "evt_sent_late",
+          "normalized_status": "sent"
+        },
+        {
+          "step_order": 1,
+          "channel": "whatsapp",
+          "behavior": "deliver",
+          "delay_seconds": 7,
+          "provider_event_id": "evt_read_first",
+          "normalized_status": "read"
+        }
+      ],
+      "expected": {
+        "final_dispatch_status": "read",
+        "late_sent_did_not_downgrade": true,
+        "duplicate_receipt_count": 1,
+        "receipt_signature_valid": true
+      }
+    },
+    {
+      "key": "hard_failure_no_retry",
+      "risk_event": {
+        "severity": "critical",
+        "reason": "Invalid primary caretaker phone endpoint"
+      },
+      "provider_behaviors": [
+        {
+          "step_order": 1,
+          "channel": "voice",
+          "behavior": "fail",
+          "delay_seconds": 2,
+          "error_code": "invalid_recipient",
+          "retry_class": "hard_failure"
+        },
+        {
+          "step_order": 2,
+          "channel": "voice",
+          "behavior": "acknowledge",
+          "delay_seconds": 8
+        }
+      ],
+      "expected": {
+        "step_1_retry_scheduled": false,
+        "step_1_attempt_count": 1,
+        "fallback_reached_step_order": 2,
+        "run_status": "acknowledged"
+      }
+    },
+    {
+      "key": "sms_region_policy_denied",
+      "risk_event": {
+        "severity": "high",
+        "reason": "SMS fallback requested without region approval"
+      },
+      "policy_overrides": {
+        "sms_region_enabled": false
+      },
+      "provider_behaviors": [
+        { "step_order": 1, "channel": "sms", "behavior": "deliver", "delay_seconds": 1 },
+        { "step_order": 2, "channel": "telegram", "behavior": "acknowledge", "delay_seconds": 5 }
+      ],
+      "expected": {
+        "sms_action_status": "skipped",
+        "skip_reason": "region_policy_denied",
+        "sms_provider_invocations": 0,
+        "fallback_reached_step_order": 2
+      }
+    },
+    {
+      "key": "telegram_unverified_upload_blocked",
+      "risk_event": {
+        "severity": "informational",
+        "reason": "Unverified Telegram upload should not enter document pipeline"
+      },
+      "channel_link_overrides": {
+        "telegram": "unverified"
+      },
+      "inbound_message": {
+        "channel": "telegram",
+        "message_type": "document",
+        "command": "/upload",
+        "contains_phi": true
+      },
+      "expected": {
+        "upload_accepted": false,
+        "document_pipeline_jobs_created": 0,
+        "response_template_id": "account_verification_v1",
+        "medical_command_executed": false
+      }
+    },
+    {
+      "key": "revoked_emergency_consent_blocks_public_number",
+      "risk_event": {
+        "severity": "critical",
+        "reason": "Critical fall event after emergency escalation consent revoked",
+        "evidence": [
+          {
+            "metric": "fall_detected",
+            "value": true,
+            "source": "simulated_watch",
+            "observed_at": "2026-05-06T18:32:00+05:30"
+          }
+        ]
+      },
+      "consent_overrides": {
+        "emergency_escalation": "revoked",
+        "voice_calls": "active",
+        "caretaker_access": "active"
+      },
+      "policy_overrides": {
+        "public_emergency_number_enabled": true
+      },
+      "expected": {
+        "public_emergency_action_status": "skipped",
+        "public_emergency_skip_reason": "consent_revoked",
+        "caretaker_voice_allowed": true,
+        "production_provider_invocations_to_public_emergency": 0
       }
     }
   ]

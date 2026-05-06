@@ -71,6 +71,85 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChannelLink"
+  /channel-templates:
+    get:
+      operationId: listChannelTemplates
+      summary: List versioned message templates and WhatsApp provider approval metadata.
+      parameters:
+        - name: channel
+          in: query
+          schema:
+            $ref: "#/components/schemas/Channel"
+        - name: approval_status
+          in: query
+          schema:
+            $ref: "#/components/schemas/TemplateApprovalStatus"
+        - name: template_kind
+          in: query
+          schema:
+            $ref: "#/components/schemas/TemplateKind"
+      responses:
+        "200":
+          description: Template registry entries.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [templates]
+                properties:
+                  templates:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MessageTemplate"
+  /call-scripts:
+    get:
+      operationId: listCallScripts
+      summary: List approved and draft voice scripts with AI disclosure validation state.
+      parameters:
+        - name: approval_status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ScriptApprovalStatus"
+        - name: script_kind
+          in: query
+          schema:
+            type: string
+            enum: [critical_caretaker, doctor_escalation, ambulance_contact, emergency_simulation]
+      responses:
+        "200":
+          description: Call script registry entries.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [scripts]
+                properties:
+                  scripts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CallScript"
+  /provider-capabilities:
+    get:
+      operationId: listProviderCapabilities
+      summary: List configured provider adapters, feature support, and production eligibility.
+      parameters:
+        - name: channel
+          in: query
+          schema:
+            $ref: "#/components/schemas/Channel"
+      responses:
+        "200":
+          description: Provider capability registry.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [providers]
+                properties:
+                  providers:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProviderCapability"
   /patients/{patient_id}/channel-messages:
     post:
       operationId: sendChannelMessage
@@ -286,9 +365,66 @@ components:
     Channel:
       type: string
       enum: [push, in_app, whatsapp, telegram, sms, voice, email]
+    ProviderKind:
+      type: string
+      enum: [fcm_apns, whatsapp_cloud, whatsapp_bsp, prototype_whatsapp_web, telegram_bot, sms_provider, voice_provider, simulation]
     VerificationStatus:
       type: string
       enum: [unverified, pending, verified, failed]
+    ConsentStatus:
+      type: string
+      enum: [not_required, missing, active, revoked, expired]
+    TemplateApprovalStatus:
+      type: string
+      enum: [draft, pending_provider_approval, approved, rejected, paused, disabled, superseded]
+    ScriptApprovalStatus:
+      type: string
+      enum: [draft, approved, disabled, superseded]
+    TemplateKind:
+      type: string
+      enum:
+        - medicine_reminder
+        - missed_dose_caretaker
+        - daily_summary_caretaker
+        - device_disconnected
+        - urgent_vitals_alert
+        - critical_escalation_caretaker
+        - doctor_escalation_summary
+        - emergency_services_summary
+        - account_verification
+        - emergency_simulation_notice
+        - verification_success
+        - high_risk_patient_checkin
+        - escalation_cancelled
+    ProviderCapability:
+      type: object
+      required: [provider, channel, production_eligible, supports_delivery_receipts, supports_buttons, supports_media_uploads]
+      properties:
+        provider:
+          $ref: "#/components/schemas/ProviderKind"
+        channel:
+          $ref: "#/components/schemas/Channel"
+        provider_account_id:
+          type: string
+        production_eligible:
+          type: boolean
+        prototype_only:
+          type: boolean
+          default: false
+        supports_delivery_receipts:
+          type: boolean
+        supports_read_receipts:
+          type: boolean
+        supports_buttons:
+          type: boolean
+        supports_media_uploads:
+          type: boolean
+        supports_location:
+          type: boolean
+        supported_locales:
+          type: array
+          items:
+            type: string
     ChannelLink:
       type: object
       required: [id, patient_id, channel, external_subject_ref, verification_status, commands_enabled, uploads_enabled]
@@ -311,11 +447,29 @@ components:
           type: string
         verification_status:
           $ref: "#/components/schemas/VerificationStatus"
+        verification_method:
+          type: string
+          enum: [otp, app_deep_link, signed_link, provider_token]
+        consent_status:
+          $ref: "#/components/schemas/ConsentStatus"
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum: [chat, uploads, reminders, alerts, calls, acknowledgements]
         commands_enabled:
           type: boolean
         uploads_enabled:
           type: boolean
+        locked_until:
+          type: string
+          format: date-time
+        blocked_reason:
+          type: string
         verified_at:
+          type: string
+          format: date-time
+        expires_at:
           type: string
           format: date-time
     CreateChannelLinkRequest:
@@ -340,12 +494,108 @@ components:
           items:
             type: string
             enum: [chat, uploads, reminders, alerts, calls, acknowledgements]
+        locale:
+          type: string
+          default: en-IN
+        challenge_ttl_seconds:
+          type: integer
+          minimum: 60
+          maximum: 86400
+    MessageTemplate:
+      type: object
+      required: [id, version, template_kind, channels, locale, approval_status, required_variables, business_initiated]
+      properties:
+        id:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        template_kind:
+          $ref: "#/components/schemas/TemplateKind"
+        channels:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Channel"
+        locale:
+          type: string
+        approval_status:
+          $ref: "#/components/schemas/TemplateApprovalStatus"
+        provider_template_name:
+          type: string
+          description: Approved WhatsApp Cloud/BSP template name when the channel requires provider approval.
+        business_initiated:
+          type: boolean
+        contains_phi:
+          type: boolean
+        required_variables:
+          type: array
+          items:
+            type: string
+        optional_variables:
+          type: array
+          items:
+            type: string
+        compliance_reviewed_at:
+          type: string
+          format: date-time
+        provider_approved_at:
+          type: string
+          format: date-time
+        superseded_by:
+          type: string
+    CallScript:
+      type: object
+      required: [id, version, script_kind, locale, approval_status, ai_disclosure_present, allowed_variables, body_template]
+      properties:
+        id:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        script_kind:
+          type: string
+          enum: [critical_caretaker, doctor_escalation, ambulance_contact, emergency_simulation]
+        locale:
+          type: string
+        approval_status:
+          $ref: "#/components/schemas/ScriptApprovalStatus"
+        ai_disclosure_present:
+          type: boolean
+        opening_text:
+          type: string
+        body_template:
+          type: string
+        allowed_variables:
+          type: array
+          items:
+            type: string
+        dtmf_menu:
+          type: array
+          items:
+            type: object
+            required: [digit, action]
+            properties:
+              digit:
+                type: string
+                pattern: "^[0-9#*]$"
+              action:
+                type: string
+                enum: [acknowledge, repeat, request_callback, transfer_configured_contact, end_call]
+        recording_allowed:
+          type: boolean
+          default: false
+        compliance_reviewed_at:
+          type: string
+          format: date-time
     DispatchRequest:
       type: object
       required: [channel, variables, reason, policy_decision_id]
       properties:
         channel:
           $ref: "#/components/schemas/Channel"
+        provider_preference:
+          $ref: "#/components/schemas/ProviderKind"
         contact_id:
           type: string
           format: uuid
@@ -360,8 +610,14 @@ components:
           format: uuid
         template_id:
           type: string
+        template_version:
+          type: integer
+          minimum: 1
         script_id:
           type: string
+        script_version:
+          type: integer
+          minimum: 1
         locale:
           type: string
           default: en-IN
@@ -384,6 +640,12 @@ components:
           type: string
         policy_decision_id:
           type: string
+        business_initiated:
+          type: boolean
+          default: false
+        service_window_expires_at:
+          type: string
+          format: date-time
         simulation:
           type: boolean
           default: false
@@ -397,20 +659,96 @@ components:
         patient_id:
           type: string
           format: uuid
+        contact_id:
+          type: string
+          format: uuid
         channel:
           $ref: "#/components/schemas/Channel"
+        provider:
+          $ref: "#/components/schemas/ProviderKind"
+        template_id:
+          type: string
+        script_id:
+          type: string
         status:
           type: string
           enum: [queued, policy_denied, provider_pending, sent, delivered, read, answered, acknowledged, failed, cancelled, expired, simulated]
+        status_reason:
+          type: string
+        attempt_number:
+          type: integer
+          minimum: 1
+        max_attempts:
+          type: integer
+          minimum: 1
         provider_message_id:
           type: string
         provider_call_id:
           type: string
+        error:
+          $ref: "#/components/schemas/ProviderError"
         next_attempt_at:
           type: string
           format: date-time
+        receipts:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeliveryReceipt"
         simulation:
           type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ProviderError:
+      type: object
+      required: [error_code, retry_class]
+      properties:
+        error_code:
+          type: string
+        retry_class:
+          type: string
+          enum: [retryable, hard_failure, policy_denied, template_blocked, recipient_unreachable, rate_limited]
+        safe_user_message:
+          type: string
+        retry_after_seconds:
+          type: integer
+          minimum: 0
+    DeliveryReceipt:
+      type: object
+      required: [id, dispatch_attempt_id, normalized_status, occurred_at, received_at, signature_valid]
+      properties:
+        id:
+          type: string
+          format: uuid
+        dispatch_attempt_id:
+          type: string
+          format: uuid
+        provider_event_id:
+          type: string
+        provider_status:
+          type: string
+        normalized_status:
+          type: string
+          enum: [accepted, queued, sent, delivered, read, ringing, answered, completed, acknowledged, busy, no_answer, failed, expired, token_invalid]
+        occurred_at:
+          type: string
+          format: date-time
+        received_at:
+          type: string
+          format: date-time
+        signature_valid:
+          type: boolean
+        monotonic_precedence:
+          type: integer
+          minimum: 0
+        raw_payload_ref:
+          type: string
+        redacted_summary:
+          type: object
+          additionalProperties: true
     StartEscalationRequest:
       type: object
       required: [requested_by, policy_id]
@@ -421,6 +759,11 @@ components:
         policy_id:
           type: string
           format: uuid
+        policy_decision_id:
+          type: string
+        emergency_service_approved:
+          type: boolean
+          default: false
         simulation:
           type: boolean
           default: false
@@ -443,10 +786,17 @@ components:
         policy_id:
           type: string
           format: uuid
+        policy_decision_id:
+          type: string
         status:
           type: string
           enum: [pending, running, awaiting_ack, acknowledged, completed, failed, cancelled]
         outcome:
+          type: string
+        simulation:
+          type: boolean
+          default: false
+        evidence_snapshot_ref:
           type: string
         actions:
           type: array
@@ -456,6 +806,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Acknowledgement"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
     EscalationAction:
       type: object
       required: [id, step_order, action_type, channel, status]
@@ -467,13 +823,36 @@ components:
           type: integer
         action_type:
           type: string
+          enum: [send_message, place_call, push_notification, wait_for_ack, share_location, cancel_notice]
         channel:
           $ref: "#/components/schemas/Channel"
+        contact_id:
+          type: string
+          format: uuid
+        contact_role:
+          type: string
+          enum: [patient, primary_caretaker, secondary_caretaker, nurse, doctor, ambulance_contact, public_emergency_number]
+        provider:
+          $ref: "#/components/schemas/ProviderKind"
         template_id:
           type: string
+        script_id:
+          type: string
+        ack_timeout_seconds:
+          type: integer
+          minimum: 0
+        retry_count:
+          type: integer
+          minimum: 0
+        max_attempts:
+          type: integer
+          minimum: 1
         status:
           type: string
           enum: [pending, attempting, sent, delivered, answered, acknowledged, failed, skipped, cancelled]
+        skip_reason:
+          type: string
+          enum: [consent_missing, consent_revoked, channel_unverified, quiet_hours_blocked, template_unapproved, provider_unavailable, region_policy_denied, simulation_blocked, production_provider_required, duplicate_suppressed]
         dispatch_attempts:
           type: array
           items:
@@ -501,7 +880,7 @@ components:
           additionalProperties: true
     Acknowledgement:
       type: object
-      required: [id, escalation_run_id, acknowledgement_method, acknowledged_at]
+      required: [id, escalation_run_id, acknowledgement_method, acknowledged_at, verified_actor]
       properties:
         id:
           type: string
@@ -517,6 +896,11 @@ components:
         acknowledged_at:
           type: string
           format: date-time
+        verified_actor:
+          type: boolean
+        source_dispatch_attempt_id:
+          type: string
+          format: uuid
     StartSimulationRequest:
       type: object
       required: [scenario_key, escalation_policy_id]
@@ -526,6 +910,13 @@ components:
         escalation_policy_id:
           type: string
           format: uuid
+        assertion_mode:
+          type: string
+          enum: [strict, allow_extra_non_external_audit_events]
+          default: strict
+        block_production_providers:
+          type: boolean
+          default: true
         synthetic_risk_event:
           type: object
           additionalProperties: true
@@ -537,6 +928,11 @@ components:
             properties:
               channel:
                 $ref: "#/components/schemas/Channel"
+              provider:
+                $ref: "#/components/schemas/ProviderKind"
+              contact_role:
+                type: string
+                enum: [patient, primary_caretaker, secondary_caretaker, nurse, doctor, ambulance_contact, public_emergency_number]
               behavior:
                 type: string
                 enum: [deliver, fail, timeout, answer, acknowledge]
@@ -566,6 +962,23 @@ components:
         actual_summary:
           type: object
           additionalProperties: true
+        assertion_results:
+          type: array
+          items:
+            type: object
+            required: [name, passed]
+            properties:
+              name:
+                type: string
+              passed:
+                type: boolean
+              detail:
+                type: string
+        production_provider_invocations:
+          type: integer
+          minimum: 0
+        simulator_provider_account_id:
+          type: string
         blocked_reasons:
           type: array
           items:
