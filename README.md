@@ -42,9 +42,13 @@ Read in this order:
 
 ## Backend Workstream Artifacts
 
-- `backend/migrations/003_channels_calls_escalation.sql` - provider configs, channel links, template/script registries, dispatch attempts, receipts, call events, acknowledgements, and simulations.
-- `backend/openapi/channels-calls-escalation.openapi.yaml` - contracts for channel linking, dispatch, provider webhooks, escalation, acknowledgement, and emergency drills.
-- `backend/tests/emergency_simulation_scenarios.md` and `backend/tests/emergency_simulation_cases.json` - end-to-end emergency simulation coverage.
+Backend artifacts now live in the dedicated backend repository:
+
+- Local path: `C:\Users\ASUS\Desktop\careagent-backend`
+- GitHub: `https://github.com/harshit-siraswal/careagent-backend`
+- Supabase project: `careagent-backend` / `kgkfrrffrjfltswwcsmw` in `ap-south-1`
+
+Use that repo for backend API code, SQL migrations, OpenAPI contracts, channel/escalation contracts, and backend tests.
 
 ## Parallel Context Windows
 
