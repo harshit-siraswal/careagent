@@ -9,7 +9,7 @@ This workstream is a planning/spec artifact. It does not scaffold the React Nati
 Files this workstream owns or feeds:
 
 - `docs/15-mobile-app-workstream.md`: mobile app implementation plan, contracts, and sequencing.
-- `backend/tests/mobile-app-permission-test-plan.md`: cross-functional test plan for permission, stale-data, disconnected-device, missed-dose, and emergency simulation behavior.
+- `tests/mobile-app-permission-test-plan.md`: cross-functional test plan for permission, stale-data, disconnected-device, missed-dose, and emergency simulation behavior.
 - Future app implementation files, once scaffolding is approved: `mobile/src/features/*`, `mobile/src/native/*`, `mobile/src/data/*`, and platform native bridges under `ios/` and `android/`.
 
 Assumptions:
@@ -866,7 +866,7 @@ Emergency simulation payload:
 - End-to-end simulator tests:
   - Full onboarding with partial health grants, document upload denial fallback, local reminder while offline, BLE disconnect/reconnect, and manual SOS simulation.
 
-The detailed cross-functional test plan lives in `backend/tests/mobile-app-permission-test-plan.md` so backend, QA, and mobile implementation can share the same scenario IDs.
+The detailed cross-functional test plan lives in `tests/mobile-app-permission-test-plan.md` so backend, QA, and mobile implementation can share the same scenario IDs.
 
 ## 9. MVP Build Order
 

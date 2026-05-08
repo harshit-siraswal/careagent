@@ -34,11 +34,11 @@ Read in this order:
 - `docs/12-implementation-backlog.md` - implementation backlog by domain.
 - `docs/13-risk-rule-catalog.md` - initial risk rule catalog and governance.
 - `docs/14-agent-runtime-selection.md` - OpenClaw, PicoClaw, NVIDIA NemoClaw, and alternative agent runtime evaluation.
-- `docs/15-mobile-app-workstream.md` - React Native mobile app implementation plan.
+- `docs/15-mobile-app-workstream.md` - mobile app implementation plan that still needs Flutter alignment.
 - `docs/16-agent-runtime-workstream.md` - Claw-compatible agent runtime implementation plan, prompts, tools, policies, flows, tests, and adapter contract.
 - `docs/17-channels-calls-escalation-workstream.md` - WhatsApp, Telegram, push, SMS fallback, voice calls, provider abstraction, escalation state machine, templates, scripts, and simulation tests.
 - `docs/18-health-device-integrations-workstream.md` - HealthKit, Health Connect, BLE, device catalog, normalization, data quality, and simulator contracts.
-- `docs/15-mobile-app-workstream.md` - patient mobile app screen map, components, native modules, permissions, offline behavior, APIs, and tests.
+- `docs/19-remaining-work-report.md` - current implementation gap report across the app and backend repositories.
 
 ## Backend Workstream Artifacts
 
