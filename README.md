@@ -50,6 +50,39 @@ Backend artifacts now live in the dedicated backend repository:
 
 Use that repo for backend API code, SQL migrations, OpenAPI contracts, channel/escalation contracts, and backend tests.
 
+## Flutter App Scaffold
+
+This repo now includes the Android-first Flutter MVP shell at the repository root.
+It includes a safety gate, Supabase Auth login page, Google OAuth entry point,
+and local placeholder screens for the first CareAgent surfaces. It does not
+include health integration, messaging credentials, or emergency-call automation.
+
+Useful commands:
+
+- `flutter pub get`
+- `flutter analyze`
+- `flutter test`
+- `flutter build apk --release`
+
+Run with Supabase Auth configured:
+
+```powershell
+flutter run --dart-define=SUPABASE_URL=https://kgkfrrffrjfltswwcsmw.supabase.co `
+  --dart-define=SUPABASE_PUBLISHABLE_KEY=<publishable-or-anon-key> `
+  --dart-define=SUPABASE_REDIRECT_URL=app.careagent://auth-callback
+```
+
+Do not use a Supabase service-role key in Flutter. The public key should come
+from the Supabase project API settings.
+
+Required Supabase dashboard setup for Google login:
+
+1. In `careagent-backend` (`kgkfrrffrjfltswwcsmw`), enable Google under Authentication > Providers.
+2. Store the Google OAuth client ID and client secret in Supabase Auth provider settings.
+3. Add `https://kgkfrrffrjfltswwcsmw.supabase.co/auth/v1/callback` as an authorized redirect URI in the Google Cloud OAuth client.
+4. Add `app.careagent://auth-callback` to Supabase Auth URL allow list / additional redirect URLs.
+5. Keep Google scopes limited to OpenID, email, and profile for the MVP login flow.
+
 ## Parallel Context Windows
 
 Use `prompts/00-master-context.md` plus one specific workstream prompt:
