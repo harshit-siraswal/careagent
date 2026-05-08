@@ -151,7 +151,7 @@ class CareAgentAuthController extends ChangeNotifier {
       }
     } on AuthException catch (error) {
       _status = CareAgentAuthStatus.error;
-      _errorMessage = error.message;
+      _errorMessage = careAgentAuthErrorMessage(error.message);
     } catch (_) {
       _status = CareAgentAuthStatus.error;
       _errorMessage = 'Google sign-in could not be started.';
@@ -191,6 +191,18 @@ class CareAgentAuthController extends ChangeNotifier {
     _subscription?.cancel();
     super.dispose();
   }
+}
+
+/// Returns a safe message for Supabase Auth failures shown in the login UI.
+String careAgentAuthErrorMessage(String rawMessage) {
+  final normalizedMessage = rawMessage.toLowerCase();
+  if (normalizedMessage.contains('provider is not enabled')) {
+    return 'Google sign-in is not enabled in Supabase Auth. Enable the '
+        'Google provider for the CareAgent project and add the Google OAuth '
+        'client ID and secret.';
+  }
+
+  return rawMessage;
 }
 
 /// Root widget for the Android-first CareAgent MVP shell.

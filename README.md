@@ -86,6 +86,26 @@ Required Supabase dashboard setup for Google login:
 4. Add `app.careagent://auth-callback` to Supabase Auth URL allow list / additional redirect URLs.
 5. Keep Google scopes limited to OpenID, email, and profile for the MVP login flow.
 
+The runtime error `Unsupported provider: provider is not enabled` means the
+Supabase Google provider is still disabled or missing its OAuth credentials.
+If using the Supabase Management API instead of the dashboard, patch the auth
+config with a Supabase personal access token and Google OAuth credentials:
+
+```powershell
+$body = @{
+  external_google_enabled = $true
+  external_google_client_id = $env:GOOGLE_CLIENT_ID
+  external_google_secret = $env:GOOGLE_CLIENT_SECRET
+} | ConvertTo-Json
+
+Invoke-RestMethod `
+  -Method Patch `
+  -Uri "https://api.supabase.com/v1/projects/kgkfrrffrjfltswwcsmw/config/auth" `
+  -Headers @{ Authorization = "Bearer $env:SUPABASE_ACCESS_TOKEN" } `
+  -ContentType "application/json" `
+  -Body $body
+```
+
 ## Parallel Context Windows
 
 Use `prompts/00-master-context.md` plus one specific workstream prompt:

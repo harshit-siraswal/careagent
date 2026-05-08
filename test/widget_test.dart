@@ -11,6 +11,17 @@ void main() {
     expect(config.publicKey, startsWith('sb_publishable_'));
   });
 
+  test('maps disabled Google provider auth error to setup guidance', () {
+    expect(
+      careAgentAuthErrorMessage(
+        'Unsupported provider: provider is not enabled',
+      ),
+      'Google sign-in is not enabled in Supabase Auth. Enable the Google '
+      'provider for the CareAgent project and add the Google OAuth client ID '
+      'and secret.',
+    );
+  });
+
   testWidgets('shows safety notice before the home shell', (tester) async {
     await tester.pumpWidget(
       CareAgentApp(
