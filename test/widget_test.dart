@@ -3,6 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('default Supabase config is ready for CareAgent project', () {
+    final config = CareAgentSupabaseConfig.fromEnvironment();
+
+    expect(config.isConfigured, isTrue);
+    expect(config.supabaseUrl, 'https://kgkfrrffrjfltswwcsmw.supabase.co');
+    expect(config.publicKey, startsWith('sb_publishable_'));
+  });
+
   testWidgets('shows safety notice before the home shell', (tester) async {
     await tester.pumpWidget(
       CareAgentApp(

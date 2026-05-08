@@ -31,8 +31,14 @@ class CareAgentSupabaseConfig {
 
   /// Reads Supabase configuration from compile-time environment values.
   factory CareAgentSupabaseConfig.fromEnvironment() {
-    const url = String.fromEnvironment('SUPABASE_URL');
-    const publishableKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
+    const url = String.fromEnvironment(
+      'SUPABASE_URL',
+      defaultValue: 'https://kgkfrrffrjfltswwcsmw.supabase.co',
+    );
+    const publishableKey = String.fromEnvironment(
+      'SUPABASE_PUBLISHABLE_KEY',
+      defaultValue: 'sb_publishable_-o5aAA7eRxFS7gDlkndE1A_QjQn6Edu',
+    );
     const anonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
     const redirectUrl = String.fromEnvironment(
       'SUPABASE_REDIRECT_URL',

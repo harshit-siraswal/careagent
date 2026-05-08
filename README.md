@@ -64,7 +64,10 @@ Useful commands:
 - `flutter test`
 - `flutter build apk --release`
 
-Run with Supabase Auth configured:
+The app includes the public CareAgent Supabase project URL and publishable key
+returned by Supabase MCP for `kgkfrrffrjfltswwcsmw`, so the login button is
+enabled in normal builds. Override them at build/run time when rotating keys or
+using another Supabase project:
 
 ```powershell
 flutter run --dart-define=SUPABASE_URL=https://kgkfrrffrjfltswwcsmw.supabase.co `
@@ -72,8 +75,8 @@ flutter run --dart-define=SUPABASE_URL=https://kgkfrrffrjfltswwcsmw.supabase.co 
   --dart-define=SUPABASE_REDIRECT_URL=app.careagent://auth-callback
 ```
 
-Do not use a Supabase service-role key in Flutter. The public key should come
-from the Supabase project API settings.
+Do not use a Supabase service-role key in Flutter. Only publishable or anon
+client keys belong in the mobile app.
 
 Required Supabase dashboard setup for Google login:
 
