@@ -1,9 +1,9 @@
 import 'package:firebase_core/firebase_core.dart';
 
-/// Firebase web options supplied through `--dart-define` values.
+/// Firebase web options for browser previews.
 ///
-/// Android uses `android/app/google-services.json`, copied from the
-/// Studyspace Firebase project.
+/// Android uses `android/app/google-services.json` for the CareAgent package
+/// registered inside the Studyspace Firebase project.
 class DefaultFirebaseOptions {
   const DefaultFirebaseOptions._();
 
@@ -16,20 +16,29 @@ class DefaultFirebaseOptions {
   static FirebaseOptions get web => _webOptions;
 
   static const FirebaseOptions _webOptions = FirebaseOptions(
-    apiKey: String.fromEnvironment('FIREBASE_API_KEY', defaultValue: ''),
-    appId: String.fromEnvironment('FIREBASE_APP_ID', defaultValue: ''),
+    apiKey: String.fromEnvironment(
+      'FIREBASE_API_KEY',
+      defaultValue: 'AIzaSyDt_mnuBryHcssBjRSdnPlh9VIC58LKL9Q',
+    ),
+    appId: String.fromEnvironment(
+      'FIREBASE_APP_ID',
+      defaultValue: '1:28032445048:web:025624ffdb03cfd54b1b8d',
+    ),
     messagingSenderId: String.fromEnvironment(
       'FIREBASE_MESSAGING_SENDER_ID',
-      defaultValue: '',
+      defaultValue: '28032445048',
     ),
-    projectId: String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: ''),
+    projectId: String.fromEnvironment(
+      'FIREBASE_PROJECT_ID',
+      defaultValue: 'studyspace-kiet',
+    ),
     authDomain: String.fromEnvironment(
       'FIREBASE_AUTH_DOMAIN',
-      defaultValue: '',
+      defaultValue: 'studyspace-kiet.firebaseapp.com',
     ),
     storageBucket: String.fromEnvironment(
       'FIREBASE_STORAGE_BUCKET',
-      defaultValue: '',
+      defaultValue: 'studyspace-kiet.firebasestorage.app',
     ),
   );
 }

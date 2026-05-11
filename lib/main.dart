@@ -39,7 +39,9 @@ class CareAgentAuthController extends ChangeNotifier {
       if (kIsWeb) {
         if (!DefaultFirebaseOptions.hasRequiredWebOptions) {
           return CareAgentAuthController.previewUnconfigured(
-            message: 'Firebase web configuration is missing for this build.',
+            message:
+                'This browser preview is missing Firebase web configuration. '
+                'Android app builds use android/app/google-services.json.',
           );
         }
         await Firebase.initializeApp(options: DefaultFirebaseOptions.web);
@@ -712,11 +714,16 @@ class _LoginScreenState extends State<_LoginScreen> {
                   const SizedBox(height: 20),
                   if (!isConfigured)
                     _SafetyBanner(
-                      title: 'Firebase configuration required',
-                      message:
-                          'Android builds need google-services.json from the '
-                          'Firebase project. Web builds need FIREBASE_* '
-                          'dart-define values.',
+                      title: kIsWeb
+                          ? 'Browser preview configuration required'
+                          : 'Android Firebase configuration required',
+                      message: kIsWeb
+                          ? 'This is the browser build. It needs Firebase web '
+                                'options through defaults or FIREBASE_* '
+                                'dart-define values. The installed Android app '
+                                'uses android/app/google-services.json.'
+                          : 'The Android app needs a google-services.json '
+                                'registered for package app.careagent.patient.',
                     )
                   else
                     _SafetyBanner(

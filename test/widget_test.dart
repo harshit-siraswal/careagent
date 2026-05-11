@@ -38,7 +38,10 @@ void main() {
 
     expect(find.text('CareAgent safety notice'), findsNothing);
     expect(find.text('Sign in to CareAgent'), findsOneWidget);
-    expect(find.text('Firebase configuration required'), findsOneWidget);
+    expect(
+      find.text('Android Firebase configuration required'),
+      findsOneWidget,
+    );
     expect(find.text('Continue with Google'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
   });
