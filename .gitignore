@@ -8,4 +8,12 @@
 build/
 android/.gradle/
 android/local.properties
+android/app/google-services.json
 android/app/src/main/java/io/flutter/plugins/
+generated/
+scratch-*
+.env
+.env.*
+!/.env.example
+*.pyc
+__pycache__/

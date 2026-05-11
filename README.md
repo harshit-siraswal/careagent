@@ -53,8 +53,9 @@ Use that repo for backend API code, SQL migrations, OpenAPI contracts, channel/e
 ## Flutter App Scaffold
 
 This repo now includes the Android-first Flutter MVP shell at the repository root.
-It includes a safety gate, Supabase Auth login page, Google OAuth entry point,
-and local placeholder screens for the first CareAgent surfaces. It does not
+It includes a safety gate, Firebase Auth login page, Google sign-in,
+email/password account flows, and local placeholder screens for the first
+CareAgent surfaces. It does not
 include health integration, messaging credentials, or emergency-call automation.
 
 Useful commands:
@@ -64,47 +65,26 @@ Useful commands:
 - `flutter test`
 - `flutter build apk --release`
 
-The app includes the public CareAgent Supabase project URL and publishable key
-returned by Supabase MCP for `kgkfrrffrjfltswwcsmw`, so the login button is
-enabled in normal builds. Override them at build/run time when rotating keys or
-using another Supabase project:
+The Android app package id is `app.careagent.patient`. Create a CareAgent-owned
+Firebase project and download a matching `android/app/google-services.json`
+before building Android release artifacts. Do not ship Studyspace package IDs or
+credentials in a CareAgent production build.
+
+For web builds, provide Firebase web config through dart defines:
 
 ```powershell
-flutter run --dart-define=SUPABASE_URL=https://kgkfrrffrjfltswwcsmw.supabase.co `
-  --dart-define=SUPABASE_PUBLISHABLE_KEY=<publishable-or-anon-key> `
-  --dart-define=SUPABASE_REDIRECT_URL=app.careagent://auth-callback
+flutter run -d chrome `
+  --dart-define=CAREAGENT_API_BASE_URL=https://<render-service>.onrender.com `
+  --dart-define=FIREBASE_API_KEY=<web-api-key> `
+  --dart-define=FIREBASE_APP_ID=<web-app-id> `
+  --dart-define=FIREBASE_MESSAGING_SENDER_ID=<sender-id> `
+  --dart-define=FIREBASE_PROJECT_ID=<project-id> `
+  --dart-define=FIREBASE_AUTH_DOMAIN=<project>.firebaseapp.com
 ```
 
-Do not use a Supabase service-role key in Flutter. Only publishable or anon
-client keys belong in the mobile app.
-
-Required Supabase dashboard setup for Google login:
-
-1. In `careagent-backend` (`kgkfrrffrjfltswwcsmw`), enable Google under Authentication > Providers.
-2. Store the Google OAuth client ID and client secret in Supabase Auth provider settings.
-3. Add `https://kgkfrrffrjfltswwcsmw.supabase.co/auth/v1/callback` as an authorized redirect URI in the Google Cloud OAuth client.
-4. Add `app.careagent://auth-callback` to Supabase Auth URL allow list / additional redirect URLs.
-5. Keep Google scopes limited to OpenID, email, and profile for the MVP login flow.
-
-The runtime error `Unsupported provider: provider is not enabled` means the
-Supabase Google provider is still disabled or missing its OAuth credentials.
-If using the Supabase Management API instead of the dashboard, patch the auth
-config with a Supabase personal access token and Google OAuth credentials:
-
-```powershell
-$body = @{
-  external_google_enabled = $true
-  external_google_client_id = $env:GOOGLE_CLIENT_ID
-  external_google_secret = $env:GOOGLE_CLIENT_SECRET
-} | ConvertTo-Json
-
-Invoke-RestMethod `
-  -Method Patch `
-  -Uri "https://api.supabase.com/v1/projects/kgkfrrffrjfltswwcsmw/config/auth" `
-  -Headers @{ Authorization = "Bearer $env:SUPABASE_ACCESS_TOKEN" } `
-  -ContentType "application/json" `
-  -Body $body
-```
+Vercel uses `vercel.json` and `scripts/vercel_build.sh` to build `build/web`.
+Set the same environment variables in Vercel, especially
+`CAREAGENT_API_BASE_URL`.
 
 ## Parallel Context Windows
 

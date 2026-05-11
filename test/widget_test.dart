@@ -1,24 +1,15 @@
 import 'package:careagent/main.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('default Supabase config is ready for CareAgent project', () {
-    final config = CareAgentSupabaseConfig.fromEnvironment();
-
-    expect(config.isConfigured, isTrue);
-    expect(config.supabaseUrl, 'https://kgkfrrffrjfltswwcsmw.supabase.co');
-    expect(config.publicKey, startsWith('sb_publishable_'));
-  });
-
-  test('maps disabled Google provider auth error to setup guidance', () {
+  test('maps disabled Firebase provider auth error to setup guidance', () {
     expect(
       careAgentAuthErrorMessage(
-        'Unsupported provider: provider is not enabled',
+        firebase_auth.FirebaseAuthException(code: 'operation-not-allowed'),
       ),
-      'Google sign-in is not enabled in Supabase Auth. Enable the Google '
-      'provider for the CareAgent project and add the Google OAuth client ID '
-      'and secret.',
+      'This sign-in method is not enabled in Firebase Auth.',
     );
   });
 
@@ -46,7 +37,9 @@ void main() {
 
     expect(find.text('CareAgent safety notice'), findsNothing);
     expect(find.text('Sign in to CareAgent'), findsOneWidget);
-    expect(find.text('Supabase configuration required'), findsOneWidget);
+    expect(find.text('Firebase configuration required'), findsOneWidget);
+    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
   });
 
   testWidgets('navigates to core placeholder surfaces', (tester) async {
@@ -62,6 +55,8 @@ void main() {
 
     expect(find.text('patient@example.com'), findsOneWidget);
 
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Consent'));
     await tester.pumpAndSettle();
     expect(find.text('Consent Center'), findsOneWidget);

@@ -1,0 +1,4 @@
+design/*.html linguist-documentation
+design/screenshots/** linguist-documentation
+generated/** linguist-generated
+*.pptx linguist-generated

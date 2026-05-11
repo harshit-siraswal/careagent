@@ -1,116 +1,94 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/services.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
+import 'config/app_config.dart';
+import 'config/firebase_options.dart';
+import 'core/careagent_api.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final config = CareAgentSupabaseConfig.fromEnvironment();
-  SupabaseClient? client;
-
-  if (config.isConfigured) {
-    await Supabase.initialize(
-      url: config.supabaseUrl,
-      anonKey: config.publicKey,
-    );
-    client = Supabase.instance.client;
-  }
-
-  runApp(CareAgentApp(authController: CareAgentAuthController(config, client)));
-}
-
-/// Supabase configuration provided at build/run time with `--dart-define`.
-class CareAgentSupabaseConfig {
-  /// Creates Supabase configuration for CareAgent authentication.
-  const CareAgentSupabaseConfig({
-    required this.supabaseUrl,
-    required this.publicKey,
-    required this.redirectUrl,
-  });
-
-  /// Reads Supabase configuration from compile-time environment values.
-  factory CareAgentSupabaseConfig.fromEnvironment() {
-    const url = String.fromEnvironment(
-      'SUPABASE_URL',
-      defaultValue: 'https://kgkfrrffrjfltswwcsmw.supabase.co',
-    );
-    const publishableKey = String.fromEnvironment(
-      'SUPABASE_PUBLISHABLE_KEY',
-      defaultValue: 'sb_publishable_-o5aAA7eRxFS7gDlkndE1A_QjQn6Edu',
-    );
-    const anonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
-    const redirectUrl = String.fromEnvironment(
-      'SUPABASE_REDIRECT_URL',
-      defaultValue: 'app.careagent://auth-callback',
-    );
-
-    return CareAgentSupabaseConfig(
-      supabaseUrl: url,
-      publicKey: publishableKey.isNotEmpty ? publishableKey : anonKey,
-      redirectUrl: redirectUrl,
-    );
-  }
-
-  /// Supabase project URL, for example `https://<project-ref>.supabase.co`.
-  final String supabaseUrl;
-
-  /// Publishable or anon key. Never use a service-role key in the app.
-  final String publicKey;
-
-  /// OAuth redirect URL allowed in Supabase Auth URL configuration.
-  final String redirectUrl;
-
-  /// Whether enough public configuration exists to start Supabase Auth.
-  bool get isConfigured => supabaseUrl.isNotEmpty && publicKey.isNotEmpty;
+  runApp(CareAgentApp(authController: await CareAgentAuthController.create()));
 }
 
 /// Authentication state shown by the app shell.
-enum CareAgentAuthStatus { unconfigured, signedOut, signingIn, signedIn, error }
+enum CareAgentAuthStatus {
+  unconfigured,
+  signedOut,
+  signingIn,
+  signedIn,
+  needsEmailVerification,
+  error,
+}
 
-/// Small Supabase Auth wrapper used by the Flutter shell.
+/// Small Firebase Auth wrapper used by the Flutter shell.
 class CareAgentAuthController extends ChangeNotifier {
-  /// Creates an auth controller backed by Supabase when `client` is provided.
-  CareAgentAuthController(this.config, SupabaseClient? client)
-    : _client = client {
-    if (!config.isConfigured || _client == null) {
-      _status = CareAgentAuthStatus.unconfigured;
-      return;
-    }
+  /// Creates a controller after initializing Firebase for the current platform.
+  static Future<CareAgentAuthController> create() async {
+    try {
+      if (kIsWeb) {
+        if (!DefaultFirebaseOptions.hasRequiredWebOptions) {
+          return CareAgentAuthController.previewUnconfigured(
+            message: 'Firebase web configuration is missing for this build.',
+          );
+        }
+        await Firebase.initializeApp(options: DefaultFirebaseOptions.web);
+      } else {
+        await Firebase.initializeApp();
+      }
 
-    _applySession(_client.auth.currentSession);
-    _subscription = _client.auth.onAuthStateChange.listen((event) {
-      _applySession(event.session);
+      return CareAgentAuthController.firebase();
+    } catch (error) {
+      return CareAgentAuthController.previewUnconfigured(
+        message: careAgentAuthErrorMessage(error),
+      );
+    }
+  }
+
+  /// Creates an auth controller backed by Firebase Auth.
+  CareAgentAuthController.firebase()
+    : _auth = firebase_auth.FirebaseAuth.instance,
+      _googleSignIn = kIsWeb
+          ? null
+          : GoogleSignIn(scopes: const <String>['email', 'profile']) {
+    final auth = _auth!;
+    _applyUser(auth.currentUser);
+    _subscription = auth.authStateChanges().listen((user) {
+      _applyUser(user);
       notifyListeners();
     });
   }
 
+  CareAgentAuthController._preview({
+    required CareAgentAuthStatus status,
+    String? email,
+    String? errorMessage,
+  }) : _auth = null,
+       _googleSignIn = null,
+       _status = status,
+       _userEmail = email,
+       _errorMessage = errorMessage;
+
   /// Creates a deterministic signed-in controller for widget tests.
   CareAgentAuthController.previewSignedIn({String? email})
-    : config = const CareAgentSupabaseConfig(
-        supabaseUrl: '',
-        publicKey: '',
-        redirectUrl: 'app.careagent://auth-callback',
-      ),
-      _client = null,
-      _status = CareAgentAuthStatus.signedIn,
-      _userEmail = email;
+    : this._preview(status: CareAgentAuthStatus.signedIn, email: email);
 
   /// Creates a deterministic unconfigured controller for widget tests.
-  CareAgentAuthController.previewUnconfigured()
-    : config = const CareAgentSupabaseConfig(
-        supabaseUrl: '',
-        publicKey: '',
-        redirectUrl: 'app.careagent://auth-callback',
-      ),
-      _client = null,
-      _status = CareAgentAuthStatus.unconfigured;
+  CareAgentAuthController.previewUnconfigured({String? message})
+    : this._preview(
+        status: CareAgentAuthStatus.unconfigured,
+        errorMessage: message,
+      );
 
-  /// Supabase public configuration used by this session.
-  final CareAgentSupabaseConfig config;
-
-  final SupabaseClient? _client;
-  StreamSubscription<AuthState>? _subscription;
+  final firebase_auth.FirebaseAuth? _auth;
+  final GoogleSignIn? _googleSignIn;
+  StreamSubscription<firebase_auth.User?>? _subscription;
   CareAgentAuthStatus _status = CareAgentAuthStatus.signedOut;
   String? _userEmail;
   String? _errorMessage;
@@ -118,18 +96,20 @@ class CareAgentAuthController extends ChangeNotifier {
   /// Current auth state.
   CareAgentAuthStatus get status => _status;
 
-  /// Signed-in user's email when Supabase exposes it.
+  /// Whether Firebase Auth is ready for user actions.
+  bool get isConfigured => _auth != null;
+
+  /// Signed-in user's email when Firebase exposes it.
   String? get userEmail => _userEmail;
 
   /// Last safe user-facing auth error.
   String? get errorMessage => _errorMessage;
 
-  /// Starts Google OAuth through Supabase Auth.
+  /// Starts Google sign-in through Firebase Auth.
   Future<void> signInWithGoogle() async {
-    if (!config.isConfigured || _client == null) {
-      _status = CareAgentAuthStatus.unconfigured;
-      _errorMessage = 'Supabase Auth is not configured for this build.';
-      notifyListeners();
+    final auth = _auth;
+    if (auth == null) {
+      _setUnconfiguredError();
       return;
     }
 
@@ -138,53 +118,200 @@ class CareAgentAuthController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final launched = await _client.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: config.redirectUrl,
-        scopes: 'email profile',
-        authScreenLaunchMode: LaunchMode.externalApplication,
-      );
+      if (kIsWeb) {
+        final provider = firebase_auth.GoogleAuthProvider()
+          ..addScope('email')
+          ..addScope('profile');
+        final credential = await auth.signInWithPopup(provider);
+        _applyUser(credential.user);
+      } else {
+        final googleSignIn = _googleSignIn;
+        if (googleSignIn == null) {
+          throw StateError('Google sign-in is not available on this platform.');
+        }
 
-      _status = CareAgentAuthStatus.signedOut;
-      if (!launched) {
-        _errorMessage = 'Could not open Google sign-in.';
+        final googleUser = await googleSignIn.signIn();
+        if (googleUser == null) {
+          _status = CareAgentAuthStatus.signedOut;
+          _errorMessage = 'Google sign-in was cancelled.';
+          notifyListeners();
+          return;
+        }
+
+        final googleAuth = await googleUser.authentication;
+        final credential = firebase_auth.GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+        final userCredential = await auth.signInWithCredential(credential);
+        _applyUser(userCredential.user);
       }
-    } on AuthException catch (error) {
+    } catch (error) {
       _status = CareAgentAuthStatus.error;
-      _errorMessage = careAgentAuthErrorMessage(error.message);
-    } catch (_) {
-      _status = CareAgentAuthStatus.error;
-      _errorMessage = 'Google sign-in could not be started.';
+      _errorMessage = careAgentAuthErrorMessage(error);
     }
 
     notifyListeners();
   }
 
-  /// Signs out of Supabase Auth.
-  Future<void> signOut() async {
-    if (_client == null) {
-      _status = CareAgentAuthStatus.unconfigured;
-      _userEmail = null;
+  /// Signs in with a Firebase email/password account.
+  Future<void> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    final auth = _auth;
+    if (auth == null) {
+      _setUnconfiguredError();
+      return;
+    }
+
+    _status = CareAgentAuthStatus.signingIn;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final credential = await auth.signInWithEmailAndPassword(
+        email: _normalizeEmail(email),
+        password: password,
+      );
+      _applyUser(credential.user);
+    } catch (error) {
+      _status = CareAgentAuthStatus.error;
+      _errorMessage = careAgentAuthErrorMessage(error);
+    }
+
+    notifyListeners();
+  }
+
+  /// Creates a Firebase email/password account and sends verification email.
+  Future<void> createAccountWithEmail({
+    required String email,
+    required String password,
+    required String displayName,
+  }) async {
+    final auth = _auth;
+    if (auth == null) {
+      _setUnconfiguredError();
+      return;
+    }
+
+    _status = CareAgentAuthStatus.signingIn;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final credential = await auth.createUserWithEmailAndPassword(
+        email: _normalizeEmail(email),
+        password: password,
+      );
+      final user = credential.user;
+      final normalizedName = displayName.trim().replaceAll(RegExp(r'\s+'), ' ');
+      if (user != null && normalizedName.isNotEmpty) {
+        await user.updateDisplayName(normalizedName);
+      }
+      await user?.sendEmailVerification();
+      _applyUser(auth.currentUser ?? user);
+    } catch (error) {
+      _status = CareAgentAuthStatus.error;
+      _errorMessage = careAgentAuthErrorMessage(error);
+    }
+
+    notifyListeners();
+  }
+
+  /// Sends a Firebase password reset email.
+  Future<void> sendPasswordResetEmail(String email) async {
+    final auth = _auth;
+    if (auth == null) {
+      _setUnconfiguredError();
+      return;
+    }
+
+    await auth.sendPasswordResetEmail(email: _normalizeEmail(email));
+  }
+
+  /// Sends another verification email for the current Firebase user.
+  Future<void> resendVerificationEmail() async {
+    final user = _auth?.currentUser;
+    if (user == null) {
+      _status = CareAgentAuthStatus.signedOut;
+      _errorMessage = 'Please sign in before requesting verification email.';
       notifyListeners();
       return;
     }
 
-    await _client.auth.signOut();
-    _applySession(null);
+    await user.sendEmailVerification();
+  }
+
+  /// Returns a fresh Firebase ID token for backend API calls.
+  Future<String?> idToken() async => _auth?.currentUser?.getIdToken();
+
+  /// Reloads the Firebase user and returns whether email verification passed.
+  Future<bool> refreshEmailVerification() async {
+    final auth = _auth;
+    final user = auth?.currentUser;
+    if (user == null) {
+      _status = CareAgentAuthStatus.signedOut;
+      _userEmail = null;
+      _errorMessage = 'Please sign in again.';
+      notifyListeners();
+      return false;
+    }
+
+    await user.reload();
+    _applyUser(auth!.currentUser);
+    notifyListeners();
+    return _status == CareAgentAuthStatus.signedIn;
+  }
+
+  /// Signs out of Firebase Auth and Google Sign-In.
+  Future<void> signOut() async {
+    try {
+      if (!kIsWeb) {
+        try {
+          await _googleSignIn?.signOut();
+        } catch (_) {
+          // Firebase remains the source of truth for session teardown.
+        }
+      }
+      await _auth?.signOut();
+      _applyUser(null);
+    } catch (error) {
+      _status = CareAgentAuthStatus.error;
+      _errorMessage = careAgentAuthErrorMessage(error);
+    }
+
     notifyListeners();
   }
 
-  void _applySession(Session? session) {
-    if (session == null) {
+  bool _requiresEmailVerification(firebase_auth.User user) {
+    final hasPasswordProvider = user.providerData.any(
+      (provider) => provider.providerId == 'password',
+    );
+    return hasPasswordProvider && !user.emailVerified;
+  }
+
+  void _applyUser(firebase_auth.User? user) {
+    if (user == null) {
       _status = CareAgentAuthStatus.signedOut;
       _userEmail = null;
       return;
     }
 
-    _status = CareAgentAuthStatus.signedIn;
-    _userEmail = session.user.email;
+    _userEmail = user.email;
+    _status = _requiresEmailVerification(user)
+        ? CareAgentAuthStatus.needsEmailVerification
+        : CareAgentAuthStatus.signedIn;
     _errorMessage = null;
   }
+
+  void _setUnconfiguredError() {
+    _status = CareAgentAuthStatus.unconfigured;
+    _errorMessage = 'Firebase Auth is not configured for this build.';
+    notifyListeners();
+  }
+
+  String _normalizeEmail(String email) => email.trim().toLowerCase();
 
   @override
   void dispose() {
@@ -193,25 +320,79 @@ class CareAgentAuthController extends ChangeNotifier {
   }
 }
 
-/// Returns a safe message for Supabase Auth failures shown in the login UI.
-String careAgentAuthErrorMessage(String rawMessage) {
-  final normalizedMessage = rawMessage.toLowerCase();
-  if (normalizedMessage.contains('provider is not enabled')) {
-    return 'Google sign-in is not enabled in Supabase Auth. Enable the '
-        'Google provider for the CareAgent project and add the Google OAuth '
-        'client ID and secret.';
+/// Returns a safe message for Firebase Auth failures shown in the login UI.
+String careAgentAuthErrorMessage(Object error) {
+  if (error is firebase_auth.FirebaseAuthException) {
+    switch (error.code) {
+      case 'email-already-in-use':
+        return 'Email is already registered.';
+      case 'invalid-email':
+        return 'Enter a valid email address.';
+      case 'user-disabled':
+        return 'This account has been disabled.';
+      case 'user-not-found':
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'Invalid email or password.';
+      case 'weak-password':
+        return 'Password must be at least 12 characters and include upper-case, lower-case, and a number.';
+      case 'too-many-requests':
+        return 'Too many attempts. Please wait and try again.';
+      case 'network-request-failed':
+        return 'Network error. Check your connection and try again.';
+      case 'operation-not-allowed':
+        return 'This sign-in method is not enabled in Firebase Auth.';
+      default:
+        final message = error.message?.trim();
+        return message == null || message.isEmpty
+            ? 'Authentication failed.'
+            : message;
+    }
   }
 
-  return rawMessage;
+  if (error is PlatformException) {
+    final message = '${error.code} ${error.message ?? ''}'.toLowerCase();
+    if (_looksLikeGoogleConfigIssue(message)) {
+      return 'Google Sign-In configuration error. Check the Firebase Android client package and SHA fingerprint.';
+    }
+    if (message.contains('sign_in_canceled') || message.contains('canceled')) {
+      return 'Google sign-in was cancelled.';
+    }
+    return error.message ?? 'Google sign-in failed.';
+  }
+
+  final message = error.toString().replaceFirst('Exception: ', '').trim();
+  if (_looksLikeGoogleConfigIssue(message.toLowerCase())) {
+    return 'Google Sign-In configuration error. Check the Firebase Android client package and SHA fingerprint.';
+  }
+  return message.isEmpty ? 'Authentication failed.' : message;
+}
+
+bool _looksLikeGoogleConfigIssue(String message) {
+  return message.contains('developer_error') ||
+      message.contains('status code 10') ||
+      message.contains('configuration');
 }
 
 /// Root widget for the Android-first CareAgent MVP shell.
 class CareAgentApp extends StatelessWidget {
   /// Creates the CareAgent application.
-  const CareAgentApp({required this.authController, super.key});
+  CareAgentApp({
+    required this.authController,
+    CareAgentApiClient? apiClient,
+    super.key,
+  }) : apiClient =
+           apiClient ??
+           CareAgentApiClient(
+             config: AppConfig.fromEnvironment(),
+             idTokenProvider: authController.idToken,
+           );
 
   /// Auth controller used to gate the protected app shell.
   final CareAgentAuthController authController;
+
+  /// Backend API client used by pilot flows.
+  final CareAgentApiClient apiClient;
 
   @override
   Widget build(BuildContext context) {
@@ -230,15 +411,16 @@ class CareAgentApp extends StatelessWidget {
           ),
         ),
       ),
-      home: _SafetyGate(authController: authController),
+      home: _SafetyGate(authController: authController, apiClient: apiClient),
     );
   }
 }
 
 class _SafetyGate extends StatefulWidget {
-  const _SafetyGate({required this.authController});
+  const _SafetyGate({required this.authController, required this.apiClient});
 
   final CareAgentAuthController authController;
+  final CareAgentApiClient apiClient;
 
   @override
   State<_SafetyGate> createState() => _SafetyGateState();
@@ -250,7 +432,10 @@ class _SafetyGateState extends State<_SafetyGate> {
   @override
   Widget build(BuildContext context) {
     if (_acceptedSafetyNotice) {
-      return _AuthGate(authController: widget.authController);
+      return _AuthGate(
+        authController: widget.authController,
+        apiClient: widget.apiClient,
+      );
     }
 
     return _SafetyNoticeScreen(
@@ -264,9 +449,10 @@ class _SafetyGateState extends State<_SafetyGate> {
 }
 
 class _AuthGate extends StatelessWidget {
-  const _AuthGate({required this.authController});
+  const _AuthGate({required this.authController, required this.apiClient});
 
   final CareAgentAuthController authController;
+  final CareAgentApiClient apiClient;
 
   @override
   Widget build(BuildContext context) {
@@ -275,6 +461,7 @@ class _AuthGate extends StatelessWidget {
       builder: (context, _) {
         if (authController.status == CareAgentAuthStatus.signedIn) {
           return _CareAgentShell(
+            apiClient: apiClient,
             userEmail: authController.userEmail,
             onSignOut: authController.signOut,
           );
@@ -286,16 +473,199 @@ class _AuthGate extends StatelessWidget {
   }
 }
 
-class _LoginScreen extends StatelessWidget {
+class _LoginScreen extends StatefulWidget {
   const _LoginScreen({required this.authController});
 
   final CareAgentAuthController authController;
 
   @override
+  State<_LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<_LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _nameController = TextEditingController();
+
+  bool _isLogin = true;
+  bool _obscurePassword = true;
+  bool _isResettingPassword = false;
+  bool _isResendingVerification = false;
+  bool _isCheckingVerification = false;
+
+  CareAgentAuthController get authController => widget.authController;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  void _toggleMode() {
+    setState(() {
+      _isLogin = !_isLogin;
+      _formKey.currentState?.reset();
+    });
+  }
+
+  Future<void> _signInWithGoogle() async {
+    await authController.signInWithGoogle();
+    if (!mounted) return;
+    final message = authController.errorMessage;
+    if (message != null &&
+        authController.status != CareAgentAuthStatus.signedIn &&
+        authController.status != CareAgentAuthStatus.needsEmailVerification) {
+      _showError(message);
+    }
+  }
+
+  Future<void> _submitEmail() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    if (_isLogin) {
+      await authController.signInWithEmail(
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
+    } else {
+      await authController.createAccountWithEmail(
+        email: _emailController.text,
+        password: _passwordController.text,
+        displayName: _nameController.text,
+      );
+    }
+
+    if (!mounted) return;
+    final message = authController.errorMessage;
+    if (message != null && authController.status == CareAgentAuthStatus.error) {
+      _showError(message);
+    }
+  }
+
+  Future<void> _sendPasswordReset() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      _showError('Enter your email address first.');
+      return;
+    }
+
+    setState(() => _isResettingPassword = true);
+    try {
+      await authController.sendPasswordResetEmail(email);
+      if (mounted) {
+        _showSuccess('Password reset email sent.');
+      }
+    } catch (error) {
+      if (mounted) {
+        _showError(careAgentAuthErrorMessage(error));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isResettingPassword = false);
+      }
+    }
+  }
+
+  Future<void> _resendVerificationEmail() async {
+    setState(() => _isResendingVerification = true);
+    try {
+      await authController.resendVerificationEmail();
+      if (mounted) {
+        _showSuccess('Verification email sent.');
+      }
+    } catch (error) {
+      if (mounted) {
+        _showError(careAgentAuthErrorMessage(error));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isResendingVerification = false);
+      }
+    }
+  }
+
+  Future<void> _checkEmailVerification() async {
+    setState(() => _isCheckingVerification = true);
+    try {
+      final verified = await authController.refreshEmailVerification();
+      if (mounted && !verified) {
+        _showError('Email is not verified yet.');
+      }
+    } catch (error) {
+      if (mounted) {
+        _showError(careAgentAuthErrorMessage(error));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingVerification = false);
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.error,
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+      ),
+    );
+  }
+
+  String? _validateEmail(String? value) {
+    final email = value?.trim() ?? '';
+    if (email.isEmpty) return 'Enter your email.';
+    final emailPattern = RegExp(
+      r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$',
+    );
+    if (!emailPattern.hasMatch(email)) return 'Enter a valid email.';
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    final password = value ?? '';
+    if (password.isEmpty) return 'Enter your password.';
+    if (password.length > 128) return 'Password is too long.';
+    if (!_isLogin) {
+      final hasUppercase = RegExp(r'[A-Z]').hasMatch(password);
+      final hasLowercase = RegExp(r'[a-z]').hasMatch(password);
+      final hasDigit = RegExp(r'\d').hasMatch(password);
+      if (password.length < 12 || !hasUppercase || !hasLowercase || !hasDigit) {
+        return 'Use 12+ chars with upper-case, lower-case, and a number.';
+      }
+    }
+    return null;
+  }
+
+  String? _validateName(String? value) {
+    final normalized = value?.trim().replaceAll(RegExp(r'\s+'), ' ') ?? '';
+    if (normalized.isEmpty) return 'Enter your name.';
+    if (normalized.length < 2) return 'Name must be at least 2 characters.';
+    if (normalized.length > 80) return 'Name must be 80 characters or fewer.';
+    return null;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (authController.status == CareAgentAuthStatus.needsEmailVerification) {
+      return _buildEmailVerificationScreen();
+    }
+
     final theme = Theme.of(context);
-    final isConfigured = authController.config.isConfigured;
+    final isConfigured = authController.isConfigured;
     final isSigningIn = authController.status == CareAgentAuthStatus.signingIn;
+    final isBusy = isSigningIn || _isResettingPassword;
 
     return Scaffold(
       body: SafeArea(
@@ -321,7 +691,7 @@ class _LoginScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'CareAgent uses Supabase Auth for account access. '
+                    'CareAgent uses Firebase Auth for account access. '
                     'Patient records, connected devices, messages, and '
                     'emergency workflows stay unavailable until a user is '
                     'authenticated and consent is configured.',
@@ -330,19 +700,18 @@ class _LoginScreen extends StatelessWidget {
                   const SizedBox(height: 20),
                   if (!isConfigured)
                     _SafetyBanner(
-                      title: 'Supabase configuration required',
+                      title: 'Firebase configuration required',
                       message:
-                          'Run the app with SUPABASE_URL and '
-                          'SUPABASE_PUBLISHABLE_KEY or SUPABASE_ANON_KEY. '
-                          'Never pass a service-role key to Flutter.',
+                          'Android builds need google-services.json from the '
+                          'Firebase project. Web builds need FIREBASE_* '
+                          'dart-define values.',
                     )
                   else
                     _SafetyBanner(
-                      title: 'Google sign-in',
+                      title: 'Firebase sign-in',
                       message:
-                          'Google OAuth opens through Supabase. Google client '
-                          'secrets remain in the Supabase project settings, '
-                          'not in the mobile app.',
+                          'Google and email/password sign-in use the same '
+                          'Firebase project configured for Studyspace.',
                     ),
                   if (authController.errorMessage != null) ...[
                     const SizedBox(height: 12),
@@ -355,8 +724,8 @@ class _LoginScreen extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: isConfigured && !isSigningIn
-                          ? authController.signInWithGoogle
+                      onPressed: isConfigured && !isBusy
+                          ? _signInWithGoogle
                           : null,
                       icon: isSigningIn
                           ? const SizedBox.square(
@@ -365,21 +734,239 @@ class _LoginScreen extends StatelessWidget {
                             )
                           : const Icon(Icons.login),
                       label: Text(
-                        isSigningIn
-                            ? 'Opening Google sign-in'
-                            : 'Continue with Google',
+                        isSigningIn ? 'Signing in' : 'Continue with Google',
                       ),
                     ),
                   ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      const Expanded(child: Divider()),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          'or use email',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                      const Expanded(child: Divider()),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        if (!_isLogin) ...[
+                          _LoginTextField(
+                            controller: _nameController,
+                            label: 'Full name',
+                            icon: Icons.person_outline,
+                            validator: _validateName,
+                            enabled: isConfigured && !isBusy,
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        _LoginTextField(
+                          controller: _emailController,
+                          label: 'Email',
+                          icon: Icons.email_outlined,
+                          keyboardType: TextInputType.emailAddress,
+                          validator: _validateEmail,
+                          enabled: isConfigured && !isBusy,
+                        ),
+                        const SizedBox(height: 12),
+                        _LoginTextField(
+                          controller: _passwordController,
+                          label: 'Password',
+                          icon: Icons.lock_outline,
+                          obscureText: _obscurePassword,
+                          validator: _validatePassword,
+                          enabled: isConfigured && !isBusy,
+                          suffix: IconButton(
+                            tooltip: _obscurePassword
+                                ? 'Show password'
+                                : 'Hide password',
+                            onPressed: isBusy
+                                ? null
+                                : () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                          ),
+                        ),
+                        if (_isLogin)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: isConfigured && !isBusy
+                                  ? _sendPasswordReset
+                                  : null,
+                              child: const Text('Forgot password?'),
+                            ),
+                          )
+                        else
+                          const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: isConfigured && !isBusy
+                                ? _submitEmail
+                                : null,
+                            child: Text(
+                              _isLogin ? 'Sign in' : 'Create account',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 12),
-                  Text(
-                    'Configured redirect: ${authController.config.redirectUrl}',
-                    style: theme.textTheme.bodySmall,
+                  Center(
+                    child: TextButton(
+                      onPressed: isBusy ? null : _toggleMode,
+                      child: Text(
+                        _isLogin
+                            ? 'Create a new account'
+                            : 'Sign in to an existing account',
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmailVerificationScreen() {
+    final theme = Theme.of(context);
+    final email = authController.userEmail ?? _emailController.text.trim();
+    final isBusy = _isCheckingVerification || _isResendingVerification;
+
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.mark_email_read_outlined,
+                    size: 56,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Verify your email',
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Open the verification link sent to $email, then return '
+                    'to CareAgent.',
+                    style: theme.textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 20),
+                  _SafetyBanner(
+                    title: 'Email verification required',
+                    message:
+                        'Email/password accounts must be verified before '
+                        'CareAgent unlocks protected health workflows.',
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: isBusy ? null : _checkEmailVerification,
+                      icon: _isCheckingVerification
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.verified_outlined),
+                      label: const Text('I verified my email'),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: isBusy ? null : _resendVerificationEmail,
+                      icon: _isResendingVerification
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.outgoing_mail),
+                      label: const Text('Resend email'),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Center(
+                    child: TextButton(
+                      onPressed: isBusy ? null : authController.signOut,
+                      child: const Text('Use a different account'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LoginTextField extends StatelessWidget {
+  const _LoginTextField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    required this.enabled,
+    this.keyboardType,
+    this.obscureText = false,
+    this.suffix,
+    this.validator,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final bool enabled;
+  final TextInputType? keyboardType;
+  final bool obscureText;
+  final Widget? suffix;
+  final String? Function(String?)? validator;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: controller,
+      enabled: enabled,
+      keyboardType: keyboardType,
+      obscureText: obscureText,
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        suffixIcon: suffix,
+        border: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(8)),
         ),
       ),
     );
@@ -449,8 +1036,13 @@ class _SafetyNoticeScreen extends StatelessWidget {
 }
 
 class _CareAgentShell extends StatefulWidget {
-  const _CareAgentShell({required this.userEmail, required this.onSignOut});
+  const _CareAgentShell({
+    required this.apiClient,
+    required this.userEmail,
+    required this.onSignOut,
+  });
 
+  final CareAgentApiClient apiClient;
   final String? userEmail;
   final Future<void> Function() onSignOut;
 
@@ -508,7 +1100,10 @@ class _CareAgentShellState extends State<_CareAgentShell> {
         ],
       ),
       body: _selectedIndex == 0
-          ? _HomeScreen(onSelectSection: _selectSection)
+          ? _HomeScreen(
+              apiClient: widget.apiClient,
+              onSelectSection: _selectSection,
+            )
           : _PlaceholderScreen(section: selectedSection),
       floatingActionButton: _selectedIndex == _sosIndex
           ? null
@@ -557,8 +1152,9 @@ class _DrawerHeader extends StatelessWidget {
 }
 
 class _HomeScreen extends StatelessWidget {
-  const _HomeScreen({required this.onSelectSection});
+  const _HomeScreen({required this.apiClient, required this.onSelectSection});
 
+  final CareAgentApiClient apiClient;
   final ValueChanged<int> onSelectSection;
 
   @override
@@ -566,15 +1162,18 @@ class _HomeScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return _ScreenFrame(
-      title: 'CareAgent MVP Shell',
-      subtitle: 'No health data, contacts, documents, or messages are active.',
+      title: 'CareAgent Pilot',
+      subtitle: 'Backend-connected pilot flows for controlled testing.',
       children: [
         _SafetyBanner(
-          title: 'Safety posture',
-          message:
-              'This shell is not monitoring you and cannot contact '
-              'emergency services. It only maps the first CareAgent surfaces.',
+          title: apiClient.isConfigured
+              ? 'Backend connected'
+              : 'Backend URL required',
+          message: apiClient.isConfigured
+              ? 'Pilot actions use the configured Render API with Firebase ID tokens.'
+              : 'Set CAREAGENT_API_BASE_URL at build time to enable live API calls.',
         ),
+        _PilotWorkspace(apiClient: apiClient),
         Text(
           'Setup areas',
           style: theme.textTheme.titleMedium?.copyWith(
@@ -601,6 +1200,412 @@ class _HomeScreen extends StatelessWidget {
             );
           },
         ),
+      ],
+    );
+  }
+}
+
+class _PilotWorkspace extends StatefulWidget {
+  const _PilotWorkspace({required this.apiClient});
+
+  final CareAgentApiClient apiClient;
+
+  @override
+  State<_PilotWorkspace> createState() => _PilotWorkspaceState();
+}
+
+class _PilotWorkspaceState extends State<_PilotWorkspace> {
+  final _nameController = TextEditingController(text: 'Pilot Patient');
+  final _metricController = TextEditingController(text: 'heart_rate');
+  final _valueController = TextEditingController(text: '92');
+  final _unitController = TextEditingController(text: 'bpm');
+  final _riskReasonController = TextEditingController(
+    text: 'Manual pilot check requires caretaker review.',
+  );
+
+  bool _busy = false;
+  String? _status;
+  Map<String, dynamic>? _patient;
+  Map<String, dynamic>? _riskEvent;
+  Map<String, dynamic>? _policy;
+  Map<String, dynamic>? _escalationRun;
+  Map<String, dynamic>? _document;
+  List<Map<String, dynamic>> _vitals = const [];
+  List<Map<String, dynamic>> _alerts = const [];
+  List<Map<String, dynamic>> _auditLogs = const [];
+
+  CareAgentApiClient get _api => widget.apiClient;
+  String? get _patientId => _patient?['id']?.toString();
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _metricController.dispose();
+    _valueController.dispose();
+    _unitController.dispose();
+    _riskReasonController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadOrCreatePatient() async {
+    await _run('Patient profile ready.', () async {
+      final patients = await _api.listPatients();
+      _patient = patients.isNotEmpty
+          ? patients.first
+          : await _api.createPatient(fullName: _nameController.text.trim());
+    });
+  }
+
+  Future<void> _grantPilotConsent() async {
+    final patientId = _requirePatient();
+    await _run('Pilot consent granted.', () async {
+      await _api.grantConsent(
+        patientId: patientId,
+        consentType: 'pilot_mvp',
+        scope: {
+          'health_data': true,
+          'audit': true,
+          'emergency_simulation': true,
+        },
+      );
+    });
+  }
+
+  Future<void> _submitVital() async {
+    final patientId = _requirePatient();
+    final value = num.tryParse(_valueController.text.trim());
+    if (value == null) {
+      setState(() => _status = 'Enter a numeric vital value.');
+      return;
+    }
+    await _run('Vital submitted.', () async {
+      await _api.submitManualVital(
+        patientId: patientId,
+        metricCode: _metricController.text.trim(),
+        value: value,
+        unit: _unitController.text.trim(),
+      );
+      _vitals = await _api.latestVitals(patientId);
+    });
+  }
+
+  Future<void> _createRiskAndAlert() async {
+    final patientId = _requirePatient();
+    await _run('Risk event and alert created.', () async {
+      _riskEvent = await _api.createRiskEvent(
+        patientId: patientId,
+        reason: _riskReasonController.text.trim(),
+      );
+      _alerts = await _api.listAlerts(patientId);
+    });
+  }
+
+  Future<void> _startSimulation() async {
+    final patientId = _requirePatient();
+    final riskEventId = _riskEvent?['id']?.toString();
+    if (riskEventId == null) {
+      setState(() => _status = 'Create a risk event before simulation.');
+      return;
+    }
+    await _run('SOS simulation started.', () async {
+      _policy ??= await _api.createSimulationPolicy(patientId);
+      _escalationRun = await _api.startSimulationEscalation(
+        riskEventId: riskEventId,
+        patientId: patientId,
+        policyId: _policy!['id'].toString(),
+      );
+    });
+  }
+
+  Future<void> _acknowledgeSimulation() async {
+    final patientId = _requirePatient();
+    final runId = _escalationRun?['id']?.toString();
+    if (runId == null) {
+      setState(() => _status = 'Start a simulation before acknowledgement.');
+      return;
+    }
+    await _run('SOS simulation acknowledged.', () async {
+      _escalationRun = await _api.acknowledgeEscalation(
+        escalationRunId: runId,
+        patientId: patientId,
+      );
+    });
+  }
+
+  Future<void> _initDocument() async {
+    final patientId = _requirePatient();
+    await _run('Document placeholder created.', () async {
+      final response = await _api.initDocumentUpload(patientId);
+      _document = response['document'] as Map<String, dynamic>?;
+    });
+  }
+
+  Future<void> _loadAudit() async {
+    final patientId = _requirePatient();
+    await _run('Audit loaded.', () async {
+      _auditLogs = await _api.auditLogs(patientId);
+    });
+  }
+
+  Future<void> _run(String success, Future<void> Function() action) async {
+    if (!_api.isConfigured) {
+      setState(
+        () => _status = 'Set CAREAGENT_API_BASE_URL to use pilot flows.',
+      );
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _status = null;
+    });
+    try {
+      await action();
+      if (mounted) {
+        setState(() => _status = success);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _status = careAgentAuthErrorMessage(error));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  String _requirePatient() {
+    final patientId = _patientId;
+    if (patientId == null) {
+      throw const CareAgentApiException('Create or load a patient first.');
+    }
+    return patientId;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.cloud_sync_outlined,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Pilot vertical slice',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (_busy)
+                  const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_status != null)
+              _SafetyBanner(title: 'Pilot status', message: _status!),
+            _PilotTextField(
+              controller: _nameController,
+              label: 'Patient name',
+              icon: Icons.person_outline,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  onPressed: _busy ? null : _loadOrCreatePatient,
+                  icon: const Icon(Icons.person_add_alt_1),
+                  label: const Text('Load/Create Patient'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: _busy || _patientId == null
+                      ? null
+                      : _grantPilotConsent,
+                  icon: const Icon(Icons.verified_user_outlined),
+                  label: const Text('Grant Consent'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: _busy || _patientId == null ? null : _initDocument,
+                  icon: const Icon(Icons.upload_file_outlined),
+                  label: const Text('Document Placeholder'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                SizedBox(
+                  width: 180,
+                  child: _PilotTextField(
+                    controller: _metricController,
+                    label: 'Metric',
+                    icon: Icons.monitor_heart_outlined,
+                  ),
+                ),
+                SizedBox(
+                  width: 120,
+                  child: _PilotTextField(
+                    controller: _valueController,
+                    label: 'Value',
+                    icon: Icons.speed_outlined,
+                  ),
+                ),
+                SizedBox(
+                  width: 100,
+                  child: _PilotTextField(
+                    controller: _unitController,
+                    label: 'Unit',
+                    icon: Icons.straighten_outlined,
+                  ),
+                ),
+                FilledButton.icon(
+                  onPressed: _busy || _patientId == null ? null : _submitVital,
+                  icon: const Icon(Icons.add_chart_outlined),
+                  label: const Text('Submit Vital'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _PilotTextField(
+              controller: _riskReasonController,
+              label: 'Risk reason',
+              icon: Icons.warning_amber_outlined,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.tonalIcon(
+                  onPressed: _busy || _patientId == null
+                      ? null
+                      : _createRiskAndAlert,
+                  icon: const Icon(Icons.notification_important_outlined),
+                  label: const Text('Create Alert'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: _busy || _patientId == null
+                      ? null
+                      : _startSimulation,
+                  icon: const Icon(Icons.emergency_outlined),
+                  label: const Text('Start SOS Simulation'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: _busy || _patientId == null
+                      ? null
+                      : _acknowledgeSimulation,
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: const Text('Acknowledge'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy || _patientId == null ? null : _loadAudit,
+                  icon: const Icon(Icons.history_outlined),
+                  label: const Text('Load Audit'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _PilotSummary(
+              patient: _patient,
+              vitals: _vitals,
+              alerts: _alerts,
+              riskEvent: _riskEvent,
+              escalationRun: _escalationRun,
+              document: _document,
+              auditLogs: _auditLogs,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PilotTextField extends StatelessWidget {
+  const _PilotTextField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        border: const OutlineInputBorder(),
+      ),
+    );
+  }
+}
+
+class _PilotSummary extends StatelessWidget {
+  const _PilotSummary({
+    required this.patient,
+    required this.vitals,
+    required this.alerts,
+    required this.riskEvent,
+    required this.escalationRun,
+    required this.document,
+    required this.auditLogs,
+  });
+
+  final Map<String, dynamic>? patient;
+  final List<Map<String, dynamic>> vitals;
+  final List<Map<String, dynamic>> alerts;
+  final Map<String, dynamic>? riskEvent;
+  final Map<String, dynamic>? escalationRun;
+  final Map<String, dynamic>? document;
+  final List<Map<String, dynamic>> auditLogs;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <String>[
+      if (patient != null)
+        'Patient: ${patient!['full_name']} (${patient!['id']})',
+      if (vitals.isNotEmpty)
+        'Vitals: ${vitals.map((item) => '${item['metric_code']} ${item['value']} ${item['unit']}').join(', ')}',
+      if (alerts.isNotEmpty)
+        'Alerts: ${alerts.length} latest ${alerts.first['status']}',
+      if (riskEvent != null)
+        'Risk: ${riskEvent!['severity']} ${riskEvent!['status']}',
+      if (escalationRun != null)
+        'Simulation: ${escalationRun!['status']} with ${(escalationRun!['actions'] as List?)?.length ?? 0} action(s)',
+      if (document != null)
+        'Document: ${document!['original_filename']} ${document!['review_status']}',
+      if (auditLogs.isNotEmpty) 'Audit events: ${auditLogs.length}',
+    ];
+    if (rows.isEmpty) {
+      return const Text('Run the pilot actions to populate this summary.');
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final row in rows)
+          Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(row)),
       ],
     );
   }
