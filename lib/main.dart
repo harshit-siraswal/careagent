@@ -10,6 +10,10 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'config/app_config.dart';
 import 'config/firebase_options.dart';
 import 'core/careagent_api.dart';
+import 'design_system/care_motion.dart';
+import 'design_system/care_theme.dart';
+import 'mascot/caro_companion.dart';
+import 'mascot/caro_state.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -396,21 +400,12 @@ class CareAgentApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const seedColor = Color(0xFF0B6E69);
-
     return MaterialApp(
       title: 'CareAgent',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: seedColor),
-        useMaterial3: true,
-        cardTheme: const CardThemeData(
-          margin: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(8)),
-          ),
-        ),
-      ),
+      theme: CareTheme.light(),
+      darkTheme: CareTheme.dark(),
+      themeMode: ThemeMode.system,
       home: _SafetyGate(authController: authController, apiClient: apiClient),
     );
   }
@@ -431,25 +426,34 @@ class _SafetyGateState extends State<_SafetyGate> {
 
   @override
   Widget build(BuildContext context) {
-    if (_acceptedSafetyNotice) {
-      return _AuthGate(
-        authController: widget.authController,
-        apiClient: widget.apiClient,
-      );
-    }
-
-    return _SafetyNoticeScreen(
-      onAccepted: () {
-        setState(() {
-          _acceptedSafetyNotice = true;
-        });
-      },
+    return AnimatedSwitcher(
+      duration: CareMotion.guided,
+      switchInCurve: CareMotion.guidedCurve,
+      switchOutCurve: CareMotion.quickCurve,
+      child: _acceptedSafetyNotice
+          ? _AuthGate(
+              key: const ValueKey('auth-gate'),
+              authController: widget.authController,
+              apiClient: widget.apiClient,
+            )
+          : _SafetyNoticeScreen(
+              key: const ValueKey('safety-notice'),
+              onAccepted: () {
+                setState(() {
+                  _acceptedSafetyNotice = true;
+                });
+              },
+            ),
     );
   }
 }
 
 class _AuthGate extends StatelessWidget {
-  const _AuthGate({required this.authController, required this.apiClient});
+  const _AuthGate({
+    required this.authController,
+    required this.apiClient,
+    super.key,
+  });
 
   final CareAgentAuthController authController;
   final CareAgentApiClient apiClient;
@@ -677,6 +681,14 @@ class _LoginScreenState extends State<_LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const CaroCompanion(
+                    state: CaroState.neutral,
+                    title: 'Caro keeps the setup guided',
+                    message:
+                        'Sign in first, then CareAgent can connect your '
+                        'profile, consent, vitals, and simulation history.',
+                  ),
+                  const SizedBox(height: 24),
                   Icon(
                     Icons.lock_person_outlined,
                     size: 56,
@@ -710,8 +722,8 @@ class _LoginScreenState extends State<_LoginScreen> {
                     _SafetyBanner(
                       title: 'Firebase sign-in',
                       message:
-                          'Google and email/password sign-in use the same '
-                          'Firebase project configured for Studyspace.',
+                          'Google and email/password sign-in use the '
+                          'configured Firebase project for CareAgent access.',
                     ),
                   if (authController.errorMessage != null) ...[
                     const SizedBox(height: 12),
@@ -862,6 +874,14 @@ class _LoginScreenState extends State<_LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const CaroCompanion(
+                    state: CaroState.concerned,
+                    title: 'One more step before health workflows',
+                    message:
+                        'Email verification protects access before records, '
+                        'consent, and care-team actions become available.',
+                  ),
+                  const SizedBox(height: 24),
                   Icon(
                     Icons.mark_email_read_outlined,
                     size: 56,
@@ -965,16 +985,122 @@ class _LoginTextField extends StatelessWidget {
         labelText: label,
         prefixIcon: Icon(icon),
         suffixIcon: suffix,
-        border: const OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(8)),
-        ),
       ),
     );
   }
 }
 
 class _SafetyNoticeScreen extends StatelessWidget {
-  const _SafetyNoticeScreen({required this.onAccepted});
+  const _SafetyNoticeScreen({required this.onAccepted, super.key});
+
+  final VoidCallback onAccepted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 920;
+            final horizontal = wide ? 48.0 : 24.0;
+
+            if (wide) {
+              return Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: horizontal,
+                  vertical: 24,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1120),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const Expanded(child: _SafetyIdentityPanel()),
+                        const SizedBox(width: 56),
+                        SizedBox(
+                          width: 520,
+                          child: _SafetyNoticeContent(onAccepted: onAccepted),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            return SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                horizontal: horizontal,
+                vertical: 24,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight - 48,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1120),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const _SafetyIdentityPanel(compact: true),
+                        const SizedBox(height: 28),
+                        _SafetyNoticeContent(onAccepted: onAccepted),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _SafetyIdentityPanel extends StatelessWidget {
+  const _SafetyIdentityPanel({this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CaroCompanion(
+          state: CaroState.greeting,
+          title: 'Caro is your care guide',
+          message:
+              'I will help you understand setup, consent, health records, '
+              'and simulation-only escalation without replacing a clinician.',
+          compact: compact,
+        ),
+        SizedBox(height: compact ? 20 : 32),
+        Text(
+          'Soft, guided care coordination.',
+          style: theme.textTheme.displayLarge,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'CareAgent keeps health workflows understandable: what is known, '
+          'what is stale, what is consented, and what safe next step is '
+          'available.',
+          style: theme.textTheme.bodyLarge,
+        ),
+      ],
+    );
+  }
+}
+
+class _SafetyNoticeContent extends StatelessWidget {
+  const _SafetyNoticeContent({required this.onAccepted});
 
   final VoidCallback onAccepted;
 
@@ -982,54 +1108,49 @@ class _SafetyNoticeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.health_and_safety_outlined,
-                    size: 56,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'CareAgent safety notice',
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'CareAgent is a health coordination shell for reminders, '
-                    'records, consent, and care-team workflows. It does not '
-                    'diagnose, prescribe, or replace a clinician.',
-                    style: theme.textTheme.bodyLarge,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'In an emergency or for severe symptoms, contact local '
-                    'emergency services or a qualified medical professional '
-                    'directly. Escalation, calls, messages, and location '
-                    'sharing must be explicitly configured before use.',
-                    style: theme.textTheme.bodyLarge,
-                  ),
-                  const SizedBox(height: 24),
-                  FilledButton.icon(
-                    onPressed: onAccepted,
-                    icon: const Icon(Icons.check_circle_outline),
-                    label: const Text('I understand'),
-                  ),
-                ],
-              ),
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.all(Radius.circular(20)),
+        border: Border.all(color: theme.colorScheme.outline),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.health_and_safety_outlined,
+            size: 48,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(height: 20),
+          Text('CareAgent safety notice', style: theme.textTheme.headlineSmall),
+          const SizedBox(height: 16),
+          Text(
+            'CareAgent is a health coordination shell for reminders, records, '
+            'consent, and care-team workflows. It does not diagnose, '
+            'prescribe, or replace a clinician.',
+            style: theme.textTheme.bodyLarge,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'In an emergency or for severe symptoms, contact local emergency '
+            'services or a qualified medical professional directly. '
+            'Escalation, calls, messages, and location sharing must be '
+            'explicitly configured before use.',
+            style: theme.textTheme.bodyLarge,
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onAccepted,
+              icon: const Icon(Icons.check_circle_outline),
+              label: const Text('I understand'),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -1104,7 +1225,7 @@ class _CareAgentShellState extends State<_CareAgentShell> {
               apiClient: widget.apiClient,
               onSelectSection: _selectSection,
             )
-          : _PlaceholderScreen(section: selectedSection),
+          : _FeaturePreviewScreen(section: selectedSection),
       floatingActionButton: _selectedIndex == _sosIndex
           ? null
           : FloatingActionButton.extended(
@@ -1141,10 +1262,7 @@ class _DrawerHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            'Android-first patient app scaffold',
-            style: theme.textTheme.bodyMedium,
-          ),
+          Text('Soft clinical companion', style: theme.textTheme.bodyMedium),
         ],
       ),
     );
@@ -1162,15 +1280,25 @@ class _HomeScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return _ScreenFrame(
-      title: 'CareAgent Pilot',
-      subtitle: 'Backend-connected pilot flows for controlled testing.',
+      title: 'Care status',
+      subtitle:
+          'A guided CareAgent workspace for setup, consent, vitals, and '
+          'simulation-only escalation.',
       children: [
+        const CaroCompanion(
+          state: CaroState.neutral,
+          title: 'Caro watches the care signals',
+          message:
+              'Start with a patient profile, consent, and a manual reading. '
+              'CareAgent will keep source, freshness, and simulation status '
+              'visible as you test the MVP flow.',
+        ),
         _SafetyBanner(
           title: apiClient.isConfigured
-              ? 'Backend connected'
-              : 'Backend URL required',
+              ? 'Backend connection ready'
+              : 'Connect the backend before live flows',
           message: apiClient.isConfigured
-              ? 'Pilot actions use the configured Render API with Firebase ID tokens.'
+              ? 'MVP actions use the configured Render API with Firebase ID tokens.'
               : 'Set CAREAGENT_API_BASE_URL at build time to enable live API calls.',
         ),
         _PilotWorkspace(apiClient: apiClient),
@@ -1334,7 +1462,7 @@ class _PilotWorkspaceState extends State<_PilotWorkspace> {
 
   Future<void> _initDocument() async {
     final patientId = _requirePatient();
-    await _run('Document placeholder created.', () async {
+    await _run('Test document record created.', () async {
       final response = await _api.initDocumentUpload(patientId);
       _document = response['document'] as Map<String, dynamic>?;
     });
@@ -1401,7 +1529,7 @@ class _PilotWorkspaceState extends State<_PilotWorkspace> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Pilot vertical slice',
+                    'MVP sandbox workspace',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -1416,7 +1544,7 @@ class _PilotWorkspaceState extends State<_PilotWorkspace> {
             ),
             const SizedBox(height: 12),
             if (_status != null)
-              _SafetyBanner(title: 'Pilot status', message: _status!),
+              _SafetyBanner(title: 'Sandbox status', message: _status!),
             _PilotTextField(
               controller: _nameController,
               label: 'Patient name',
@@ -1442,7 +1570,7 @@ class _PilotWorkspaceState extends State<_PilotWorkspace> {
                 FilledButton.tonalIcon(
                   onPressed: _busy || _patientId == null ? null : _initDocument,
                   icon: const Icon(Icons.upload_file_outlined),
-                  label: const Text('Document Placeholder'),
+                  label: const Text('Create Test Document'),
                 ),
               ],
             ),
@@ -1553,11 +1681,7 @@ class _PilotTextField extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        border: const OutlineInputBorder(),
-      ),
+      decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
     );
   }
 }
@@ -1611,8 +1735,8 @@ class _PilotSummary extends StatelessWidget {
   }
 }
 
-class _PlaceholderScreen extends StatelessWidget {
-  const _PlaceholderScreen({required this.section});
+class _FeaturePreviewScreen extends StatelessWidget {
+  const _FeaturePreviewScreen({required this.section});
 
   final _Section section;
 
@@ -1622,11 +1746,38 @@ class _PlaceholderScreen extends StatelessWidget {
       title: section.heading,
       subtitle: section.description,
       children: [
+        CaroCompanion(
+          state: _caroStateFor(section.title),
+          title: _caroTitleFor(section.title),
+          message: section.shortLabel,
+        ),
         _SafetyBanner(title: section.noticeTitle, message: section.notice),
         for (final item in section.items)
           _InfoTile(icon: item.icon, title: item.title, body: item.body),
       ],
     );
+  }
+
+  CaroState _caroStateFor(String title) {
+    return switch (title) {
+      'Consent' => CaroState.concerned,
+      'Vitals' => CaroState.listening,
+      'Chat' => CaroState.listening,
+      'SOS' => CaroState.simulation,
+      'Documents' => CaroState.handoff,
+      _ => CaroState.neutral,
+    };
+  }
+
+  String _caroTitleFor(String title) {
+    return switch (title) {
+      'Consent' => 'Caro keeps consent visible',
+      'Vitals' => 'Caro checks source and freshness',
+      'Chat' => 'Caro answers with boundaries',
+      'SOS' => 'Caro keeps this in simulation mode',
+      'Documents' => 'Caro waits for reviewed sources',
+      _ => 'Caro guides this setup area',
+    };
   }
 }
 
@@ -1646,23 +1797,34 @@ class _ScreenFrame extends StatelessWidget {
     final theme = Theme.of(context);
 
     return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-        children: [
-          Text(
-            title,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(subtitle, style: theme.textTheme.bodyLarge),
-          const SizedBox(height: 20),
-          ...children.expand((child) sync* {
-            yield child;
-            yield const SizedBox(height: 12);
-          }),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final horizontal = constraints.maxWidth >= 720 ? 32.0 : 16.0;
+
+          return ListView(
+            padding: EdgeInsets.fromLTRB(horizontal, 16, horizontal, 96),
+            children: [
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1040),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: theme.textTheme.headlineSmall),
+                      const SizedBox(height: 8),
+                      Text(subtitle, style: theme.textTheme.bodyLarge),
+                      const SizedBox(height: 20),
+                      ...children.expand((child) sync* {
+                        yield child;
+                        yield const SizedBox(height: 12);
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1678,8 +1840,14 @@ class _SafetyBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Card(
-      color: theme.colorScheme.secondaryContainer,
+    return AnimatedContainer(
+      duration: CareMotion.standard,
+      curve: CareMotion.standardCurve,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer,
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+        border: Border.all(color: theme.colorScheme.outline),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
@@ -1698,7 +1866,6 @@ class _SafetyBanner extends StatelessWidget {
                     title,
                     style: theme.textTheme.titleSmall?.copyWith(
                       color: theme.colorScheme.onSecondaryContainer,
-                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -1732,28 +1899,29 @@ class _SectionCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: const BorderRadius.all(Radius.circular(8)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(section.icon, color: theme.colorScheme.primary),
-              const Spacer(),
-              Text(
-                section.title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
+        child: Row(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(section.icon, color: theme.colorScheme.primary),
+                    const Spacer(),
+                    Text(section.title, style: theme.textTheme.titleSmall),
+                    const SizedBox(height: 6),
+                    Text(
+                      section.shortLabel,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                section.shortLabel,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium,
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1831,7 +1999,7 @@ const _sections = <_Section>[
     title: 'Home',
     heading: 'CareAgent MVP Shell',
     shortLabel: 'Safety-first starting point',
-    description: 'A conservative app shell for the Android-first MVP.',
+    description: 'A guided patient app foundation for the controlled MVP.',
     noticeTitle: 'No monitoring active',
     notice: 'This scaffold does not collect or interpret health data.',
     icon: Icons.home_outlined,
@@ -1842,8 +2010,8 @@ const _sections = <_Section>[
     title: 'Onboarding',
     heading: 'Onboarding',
     shortLabel: 'Profile, care team, and permissions',
-    description: 'Placeholder flow for patient profile setup and first run.',
-    noticeTitle: 'Setup is local only',
+    description: 'Guided profile setup for first-run care coordination.',
+    noticeTitle: 'Setup needs a saved profile',
     notice:
         'No account, contacts, permissions, or health data are saved by '
         'this shell.',
@@ -1854,21 +2022,21 @@ const _sections = <_Section>[
         icon: Icons.badge_outlined,
         title: 'Patient profile',
         body:
-            'Future form for basic profile, language, conditions, '
+            'Collects basic profile, language, conditions, '
             'allergies, and care notes.',
       ),
       _InfoItem(
         icon: Icons.groups_outlined,
         title: 'Care team',
         body:
-            'Future setup for family, nurse, doctor, and emergency contact '
+            'Prepares family, nurse, doctor, and emergency contact '
             'order with verification status.',
       ),
       _InfoItem(
         icon: Icons.watch_outlined,
         title: 'Health sources',
         body:
-            'Future handoff for Health Connect, BLE devices, manual entry, '
+            'Connects Health Connect, BLE devices, manual entry, '
             'and document/photo fallback.',
       ),
     ],
@@ -1877,7 +2045,7 @@ const _sections = <_Section>[
     title: 'Consent',
     heading: 'Consent Center',
     shortLabel: 'Separate grants and revocation',
-    description: 'Placeholder for purpose-specific consent controls.',
+    description: 'Purpose-specific consent controls and revocation states.',
     noticeTitle: 'No consent has been granted',
     notice:
         'Health data, documents, caretaker access, channels, calls, and '
@@ -1889,21 +2057,21 @@ const _sections = <_Section>[
         icon: Icons.monitor_heart_outlined,
         title: 'Health data consent',
         body:
-            'Future controls for Health Connect, connected devices, '
+            'Controls Health Connect, connected devices, '
             'freshness labels, and emergency-use eligibility.',
       ),
       _InfoItem(
         icon: Icons.folder_copy_outlined,
         title: 'Document consent',
         body:
-            'Future controls for uploads, OCR, extraction review, and '
+            'Controls uploads, OCR, extraction review, and '
             'source-grounded answers.',
       ),
       _InfoItem(
         icon: Icons.share_location_outlined,
         title: 'Escalation consent',
         body:
-            'Future controls for caretaker alerts, AI disclosure, calls, '
+            'Controls caretaker alerts, AI disclosure, calls, '
             'messages, and emergency-only location sharing.',
       ),
     ],
@@ -1912,7 +2080,7 @@ const _sections = <_Section>[
     title: 'Vitals',
     heading: 'Vitals',
     shortLabel: 'Latest readings and source status',
-    description: 'Placeholder dashboard for recent observations.',
+    description: 'Recent observations with unit, source, and freshness.',
     noticeTitle: 'Unavailable is not normal',
     notice:
         'Missing or stale data must never be shown as healthy or used to '
@@ -1924,21 +2092,21 @@ const _sections = <_Section>[
         icon: Icons.favorite_border,
         title: 'Heart rate',
         body:
-            'Unavailable. Future cards show value, unit, source, observed '
+            'Unavailable. Reading cards show value, unit, source, observed '
             'time, freshness, and reliability tier.',
       ),
       _InfoItem(
         icon: Icons.bloodtype_outlined,
         title: 'Blood pressure and glucose',
         body:
-            'Unavailable. Future entries can come from Health Connect, BLE, '
+            'Unavailable. Entries can come from Health Connect, BLE, '
             'manual entry, OCR, or reviewed records.',
       ),
       _InfoItem(
         icon: Icons.sensors_outlined,
         title: 'Device health',
         body:
-            'Future device status shows connected, stale, disconnected, '
+            'Device status shows connected, stale, disconnected, '
             'permission required, and last sync states.',
       ),
     ],
@@ -1947,7 +2115,7 @@ const _sections = <_Section>[
     title: 'Medicines',
     heading: 'Medicines',
     shortLabel: 'Schedules and reminders',
-    description: 'Placeholder for schedules, dose history, and reminders.',
+    description: 'Schedules, dose history, and reminder readiness.',
     noticeTitle: 'No reminders configured',
     notice:
         'Medicine imports from prescriptions require user review before '
@@ -1958,13 +2126,13 @@ const _sections = <_Section>[
       _InfoItem(
         icon: Icons.today_outlined,
         title: 'Today',
-        body: 'Future list for due, taken, snoozed, skipped, and missed doses.',
+        body: 'Tracks due, taken, snoozed, skipped, and missed doses.',
       ),
       _InfoItem(
         icon: Icons.alarm_outlined,
         title: 'Local reminder fallback',
         body:
-            'Future reminders should keep working during backend outages '
+            'Reminders should keep working during backend outages '
             'when notification consent allows it.',
       ),
       _InfoItem(
@@ -1980,10 +2148,10 @@ const _sections = <_Section>[
     title: 'Documents',
     heading: 'Documents',
     shortLabel: 'Uploads and extraction review',
-    description: 'Placeholder for medical records and prescriptions.',
+    description: 'Medical records, prescriptions, and reviewed facts.',
     noticeTitle: 'No documents stored',
     notice:
-        'Future OCR and extraction must show sources and allow correction '
+        'OCR and extraction must show sources and allow correction '
         'before extracted facts are treated as reviewed.',
     icon: Icons.description_outlined,
     selectedIcon: Icons.description,
@@ -1992,21 +2160,21 @@ const _sections = <_Section>[
         icon: Icons.upload_file_outlined,
         title: 'Upload',
         body:
-            'Future entry points for camera, photo library, file picker, '
+            'Entry points for camera, photo library, file picker, '
             'and channel handoff.',
       ),
       _InfoItem(
         icon: Icons.fact_check_outlined,
         title: 'Extraction review',
         body:
-            'Future review rows show value, confidence, source snippet, '
+            'Review rows show value, confidence, source snippet, '
             'and confirm, edit, or reject actions.',
       ),
       _InfoItem(
         icon: Icons.source_outlined,
         title: 'Source links',
         body:
-            'Future chat answers about records should cite reviewed source '
+            'Chat answers about records should cite reviewed source '
             'documents or recent observations.',
       ),
     ],
@@ -2014,11 +2182,11 @@ const _sections = <_Section>[
   _Section(
     title: 'Chat',
     heading: 'Chat',
-    shortLabel: 'Source-grounded assistant placeholder',
-    description: 'Placeholder for in-app CareAgent conversations.',
+    shortLabel: 'Source-grounded assistant',
+    description: 'In-app CareAgent conversations with safe boundaries.',
     noticeTitle: 'No medical advice engine active',
     notice:
-        'Future chat should say when data is missing or stale and refuse '
+        'CareAgent chat should say when data is missing or stale and refuse '
         'requests to change medication or ignore clinician advice.',
     icon: Icons.chat_bubble_outline,
     selectedIcon: Icons.chat_bubble,
@@ -2027,21 +2195,21 @@ const _sections = <_Section>[
         icon: Icons.forum_outlined,
         title: 'Caro conversation',
         body:
-            'Future messages should be grounded in reviewed documents, '
+            'Messages should be grounded in reviewed documents, '
             'recent observations, and backend policy.',
       ),
       _InfoItem(
         icon: Icons.approval_outlined,
         title: 'Tool confirmations',
         body:
-            'Future calls, messages, sharing, contact changes, and '
+            'Calls, messages, sharing, contact changes, and '
             'escalation changes require explicit confirmation.',
       ),
       _InfoItem(
         icon: Icons.warning_amber_outlined,
         title: 'Urgent symptoms',
         body:
-            'Future chat should direct severe or urgent symptoms toward '
+            'Chat should direct severe or urgent symptoms toward '
             'emergency help instead of trying to manage them locally.',
       ),
     ],
@@ -2049,12 +2217,12 @@ const _sections = <_Section>[
   _Section(
     title: 'SOS',
     heading: 'SOS',
-    shortLabel: 'Emergency readiness placeholder',
-    description: 'Placeholder for manual SOS and escalation status.',
+    shortLabel: 'Emergency readiness',
+    description: 'Manual SOS readiness and simulation-only escalation status.',
     noticeTitle: 'This screen does not call emergency services',
     notice:
-        'In a real emergency, call your local emergency number now. Future '
-        'automation requires explicit consent, verified contacts, and audit.',
+        'In a real emergency, call your local emergency number now. '
+        'Automation requires explicit consent, verified contacts, and audit.',
     icon: Icons.emergency_outlined,
     selectedIcon: Icons.emergency,
     items: [
@@ -2062,21 +2230,21 @@ const _sections = <_Section>[
         icon: Icons.contact_phone_outlined,
         title: 'Emergency contacts',
         body:
-            'Future configuration for primary caretaker, secondary contact, '
+            'Configures primary caretaker, secondary contact, '
             'doctor, ambulance, hospital, and fallback order.',
       ),
       _InfoItem(
         icon: Icons.timeline_outlined,
         title: 'Escalation timeline',
         body:
-            'Future incidents should show prompts, messages, calls, '
+            'Incidents should show prompts, messages, calls, '
             'acknowledgements, timestamps, and cancellation paths.',
       ),
       _InfoItem(
         icon: Icons.science_outlined,
         title: 'Simulation mode',
         body:
-            'Future drills must be clearly labeled as test mode and must '
+            'Drills must be clearly labeled as test mode and must '
             'never call real emergency services.',
       ),
     ],

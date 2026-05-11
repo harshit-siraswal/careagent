@@ -32,6 +32,7 @@ void main() {
       ),
     );
 
+    await tester.ensureVisible(find.text('I understand'));
     await tester.tap(find.text('I understand'));
     await tester.pumpAndSettle();
 
@@ -42,7 +43,7 @@ void main() {
     expect(find.text('Sign in'), findsOneWidget);
   });
 
-  testWidgets('navigates to core placeholder surfaces', (tester) async {
+  testWidgets('navigates to core feature surfaces', (tester) async {
     await tester.pumpWidget(
       CareAgentApp(
         authController: CareAgentAuthController.previewSignedIn(
@@ -50,6 +51,7 @@ void main() {
         ),
       ),
     );
+    await tester.ensureVisible(find.text('I understand'));
     await tester.tap(find.text('I understand'));
     await tester.pumpAndSettle();
 
@@ -57,7 +59,9 @@ void main() {
 
     await tester.tap(find.byTooltip('Open navigation menu'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Consent'));
+    await tester.tap(
+      find.widgetWithText(NavigationDrawerDestination, 'Consent'),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Consent Center'), findsOneWidget);
     expect(find.text('No consent has been granted'), findsOneWidget);
