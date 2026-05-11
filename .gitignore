@@ -8,6 +8,9 @@
 build/
 android/.gradle/
 android/local.properties
+android/key.properties
+android/*.jks
+android/*.keystore
 android/app/google-services.json
 android/app/src/main/java/io/flutter/plugins/
 generated/

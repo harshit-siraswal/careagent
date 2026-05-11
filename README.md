@@ -70,6 +70,11 @@ Firebase project and download a matching `android/app/google-services.json`
 before building Android release artifacts. Do not ship Studyspace package IDs or
 credentials in a CareAgent production build.
 
+Release signing uses `android/key.properties` when present. Keep that file and
+the keystore out of git. CI expects the real Firebase Android config in the
+`GOOGLE_SERVICES_JSON_BASE64` repository secret before the APK release build can
+pass.
+
 For web builds, provide Firebase web config through dart defines:
 
 ```powershell
