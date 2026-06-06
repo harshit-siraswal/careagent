@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config/app_config.dart';
 import 'config/firebase_options.dart';
@@ -14,6 +15,9 @@ import 'design_system/care_motion.dart';
 import 'design_system/care_theme.dart';
 import 'mascot/caro_companion.dart';
 import 'mascot/caro_state.dart';
+
+/// Current safety notice copy version stored after acknowledgement.
+const String careAgentSafetyNoticeVersion = 'pilot-v1';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +33,63 @@ enum CareAgentAuthStatus {
   signedIn,
   needsEmailVerification,
   error,
+}
+
+/// Persists whether the current safety notice version was acknowledged.
+abstract class SafetyNoticeStore {
+  /// Returns whether [version] has already been accepted.
+  Future<bool> isAccepted({String version = careAgentSafetyNoticeVersion});
+
+  /// Stores acceptance for [version].
+  Future<void> accept({String version = careAgentSafetyNoticeVersion});
+}
+
+/// Safety notice store backed by platform preferences.
+class SharedPreferencesSafetyNoticeStore implements SafetyNoticeStore {
+  /// Creates a shared-preferences backed safety notice store.
+  const SharedPreferencesSafetyNoticeStore();
+
+  static const _acceptedVersionKey = 'careagent.safety_notice.accepted_version';
+  static const _acceptedAtKey = 'careagent.safety_notice.accepted_at';
+
+  @override
+  Future<bool> isAccepted({
+    String version = careAgentSafetyNoticeVersion,
+  }) async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getString(_acceptedVersionKey) == version;
+  }
+
+  @override
+  Future<void> accept({String version = careAgentSafetyNoticeVersion}) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_acceptedVersionKey, version);
+    await preferences.setString(
+      _acceptedAtKey,
+      DateTime.now().toUtc().toIso8601String(),
+    );
+  }
+}
+
+/// In-memory safety notice store for tests and previews.
+class MemorySafetyNoticeStore implements SafetyNoticeStore {
+  /// Creates an in-memory safety notice store.
+  MemorySafetyNoticeStore({bool accepted = false})
+    : _acceptedVersion = accepted ? careAgentSafetyNoticeVersion : null;
+
+  String? _acceptedVersion;
+
+  @override
+  Future<bool> isAccepted({
+    String version = careAgentSafetyNoticeVersion,
+  }) async {
+    return _acceptedVersion == version;
+  }
+
+  @override
+  Future<void> accept({String version = careAgentSafetyNoticeVersion}) async {
+    _acceptedVersion = version;
+  }
 }
 
 /// Small Firebase Auth wrapper used by the Flutter shell.
@@ -386,19 +447,25 @@ class CareAgentApp extends StatelessWidget {
   CareAgentApp({
     required this.authController,
     CareAgentApiClient? apiClient,
+    SafetyNoticeStore? safetyNoticeStore,
     super.key,
   }) : apiClient =
            apiClient ??
            CareAgentApiClient(
              config: AppConfig.fromEnvironment(),
              idTokenProvider: authController.idToken,
-           );
+           ),
+       safetyNoticeStore =
+           safetyNoticeStore ?? const SharedPreferencesSafetyNoticeStore();
 
   /// Auth controller used to gate the protected app shell.
   final CareAgentAuthController authController;
 
   /// Backend API client used by pilot flows.
   final CareAgentApiClient apiClient;
+
+  /// Store used to persist safety notice acknowledgement.
+  final SafetyNoticeStore safetyNoticeStore;
 
   @override
   Widget build(BuildContext context) {
@@ -408,26 +475,68 @@ class CareAgentApp extends StatelessWidget {
       theme: CareTheme.light(),
       darkTheme: CareTheme.dark(),
       themeMode: ThemeMode.system,
-      home: _SafetyGate(authController: authController, apiClient: apiClient),
+      home: _SafetyGate(
+        authController: authController,
+        apiClient: apiClient,
+        safetyNoticeStore: safetyNoticeStore,
+      ),
     );
   }
 }
 
 class _SafetyGate extends StatefulWidget {
-  const _SafetyGate({required this.authController, required this.apiClient});
+  const _SafetyGate({
+    required this.authController,
+    required this.apiClient,
+    required this.safetyNoticeStore,
+  });
 
   final CareAgentAuthController authController;
   final CareAgentApiClient apiClient;
+  final SafetyNoticeStore safetyNoticeStore;
 
   @override
   State<_SafetyGate> createState() => _SafetyGateState();
 }
 
 class _SafetyGateState extends State<_SafetyGate> {
+  bool _loadingSafetyNotice = true;
   bool _acceptedSafetyNotice = false;
 
   @override
+  void initState() {
+    super.initState();
+    unawaited(_loadSafetyNotice());
+  }
+
+  Future<void> _loadSafetyNotice() async {
+    var accepted = false;
+    try {
+      accepted = await widget.safetyNoticeStore.isAccepted();
+    } catch (_) {
+      accepted = false;
+    }
+    if (!mounted) return;
+    setState(() {
+      _acceptedSafetyNotice = accepted;
+      _loadingSafetyNotice = false;
+    });
+  }
+
+  Future<void> _acceptSafetyNotice() async {
+    await widget.safetyNoticeStore.accept();
+    if (!mounted) return;
+    setState(() {
+      _acceptedSafetyNotice = true;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_loadingSafetyNotice) {
+      return const _SafetyNoticeLoadingScreen();
+    }
+
     return AnimatedSwitcher(
       duration: CareMotion.guided,
       switchInCurve: CareMotion.guidedCurve,
@@ -440,13 +549,18 @@ class _SafetyGateState extends State<_SafetyGate> {
             )
           : _SafetyNoticeScreen(
               key: const ValueKey('safety-notice'),
-              onAccepted: () {
-                setState(() {
-                  _acceptedSafetyNotice = true;
-                });
-              },
+              onAccepted: () => unawaited(_acceptSafetyNotice()),
             ),
     );
+  }
+}
+
+class _SafetyNoticeLoadingScreen extends StatelessWidget {
+  const _SafetyNoticeLoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }
 
@@ -1350,9 +1464,11 @@ class _PilotWorkspace extends StatefulWidget {
 }
 
 class _PilotWorkspaceState extends State<_PilotWorkspace> {
+  static const _pilotConsentType = 'pilot_mvp';
+
   final _nameController = TextEditingController(text: 'Pilot Patient');
   final _metricController = TextEditingController(text: 'heart_rate');
-  final _valueController = TextEditingController(text: '92');
+  final _valueController = TextEditingController(text: '132');
   final _unitController = TextEditingController(text: 'bpm');
   final _riskReasonController = TextEditingController(
     text: 'Manual pilot check requires caretaker review.',
@@ -1365,12 +1481,22 @@ class _PilotWorkspaceState extends State<_PilotWorkspace> {
   Map<String, dynamic>? _policy;
   Map<String, dynamic>? _escalationRun;
   Map<String, dynamic>? _document;
+  List<Map<String, dynamic>> _consents = const [];
   List<Map<String, dynamic>> _vitals = const [];
   List<Map<String, dynamic>> _alerts = const [];
   List<Map<String, dynamic>> _auditLogs = const [];
 
   CareAgentApiClient get _api => widget.apiClient;
   String? get _patientId => _patient?['id']?.toString();
+  Map<String, dynamic>? get _activePilotConsent {
+    for (final consent in _consents) {
+      if (consent['consent_type'] == _pilotConsentType &&
+          consent['status'] == 'active') {
+        return consent;
+      }
+    }
+    return null;
+  }
 
   @override
   void dispose() {
@@ -1388,6 +1514,7 @@ class _PilotWorkspaceState extends State<_PilotWorkspace> {
       _patient = patients.isNotEmpty
           ? patients.first
           : await _api.createPatient(fullName: _nameController.text.trim());
+      await _refreshConsents();
     });
   }
 
@@ -1396,14 +1523,37 @@ class _PilotWorkspaceState extends State<_PilotWorkspace> {
     await _run('Pilot consent granted.', () async {
       await _api.grantConsent(
         patientId: patientId,
-        consentType: 'pilot_mvp',
+        consentType: _pilotConsentType,
         scope: {
           'health_data': true,
           'audit': true,
           'emergency_simulation': true,
         },
       );
+      await _refreshConsents();
     });
+  }
+
+  Future<void> _revokePilotConsent() async {
+    final patientId = _requirePatient();
+    final consentId = _activePilotConsent?['id']?.toString();
+    if (consentId == null) {
+      setState(() => _status = 'No active pilot consent to revoke.');
+      return;
+    }
+    await _run('Pilot consent revoked.', () async {
+      await _api.revokeConsent(
+        patientId: patientId,
+        consentId: consentId,
+        reason: 'patient withdrew pilot consent',
+      );
+      await _refreshConsents();
+    });
+  }
+
+  Future<void> _refreshConsents() async {
+    final patientId = _requirePatient();
+    _consents = await _api.listConsents(patientId);
   }
 
   Future<void> _submitVital() async {
@@ -1413,14 +1563,19 @@ class _PilotWorkspaceState extends State<_PilotWorkspace> {
       setState(() => _status = 'Enter a numeric vital value.');
       return;
     }
-    await _run('Vital submitted.', () async {
-      await _api.submitManualVital(
+    await _run('Vital submitted and evaluated.', () async {
+      final response = await _api.submitManualVital(
         patientId: patientId,
         metricCode: _metricController.text.trim(),
         value: value,
         unit: _unitController.text.trim(),
       );
       _vitals = await _api.latestVitals(patientId);
+      final generatedRiskEvent = _firstMap(response['risk_events']);
+      if (generatedRiskEvent != null) {
+        _riskEvent = generatedRiskEvent;
+        _alerts = await _api.listAlerts(patientId);
+      }
     });
   }
 
@@ -1517,6 +1672,16 @@ class _PilotWorkspaceState extends State<_PilotWorkspace> {
     return patientId;
   }
 
+  Map<String, dynamic>? _firstMap(Object? value) {
+    if (value is! List) return null;
+    for (final item in value) {
+      if (item is Map) {
+        return item.map((key, value) => MapEntry(key.toString(), value));
+      }
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1568,11 +1733,19 @@ class _PilotWorkspaceState extends State<_PilotWorkspace> {
                   label: const Text('Load/Create Patient'),
                 ),
                 FilledButton.tonalIcon(
-                  onPressed: _busy || _patientId == null
+                  onPressed:
+                      _busy || _patientId == null || _activePilotConsent != null
                       ? null
                       : _grantPilotConsent,
                   icon: const Icon(Icons.verified_user_outlined),
                   label: const Text('Grant Consent'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy || _activePilotConsent == null
+                      ? null
+                      : _revokePilotConsent,
+                  icon: const Icon(Icons.remove_circle_outline),
+                  label: const Text('Revoke Consent'),
                 ),
                 FilledButton.tonalIcon(
                   onPressed: _busy || _patientId == null ? null : _initDocument,
@@ -1581,6 +1754,8 @@ class _PilotWorkspaceState extends State<_PilotWorkspace> {
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            _PilotConsentStatus(consents: _consents),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -1613,7 +1788,7 @@ class _PilotWorkspaceState extends State<_PilotWorkspace> {
                 FilledButton.icon(
                   onPressed: _busy || _patientId == null ? null : _submitVital,
                   icon: const Icon(Icons.add_chart_outlined),
-                  label: const Text('Submit Vital'),
+                  label: const Text('Submit + Evaluate'),
                 ),
               ],
             ),
@@ -1659,6 +1834,7 @@ class _PilotWorkspaceState extends State<_PilotWorkspace> {
             const SizedBox(height: 12),
             _PilotSummary(
               patient: _patient,
+              consents: _consents,
               vitals: _vitals,
               alerts: _alerts,
               riskEvent: _riskEvent,
@@ -1693,9 +1869,74 @@ class _PilotTextField extends StatelessWidget {
   }
 }
 
+class _PilotConsentStatus extends StatelessWidget {
+  const _PilotConsentStatus({required this.consents});
+
+  final List<Map<String, dynamic>> consents;
+
+  bool get _hasActivePilotConsent {
+    return consents.any(
+      (consent) =>
+          consent['consent_type'] == _PilotWorkspaceState._pilotConsentType &&
+          consent['status'] == 'active',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final title = _hasActivePilotConsent
+        ? 'Pilot consent active'
+        : 'Pilot consent not active';
+    final message = _hasActivePilotConsent
+        ? 'Backend consent is persisted and can be revoked.'
+        : 'Grant consent before testing vitals, documents, audit, and simulation.';
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              _hasActivePilotConsent
+                  ? Icons.verified_user_outlined
+                  : Icons.privacy_tip_outlined,
+              color: _hasActivePilotConsent
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(message, style: theme.textTheme.bodyMedium),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PilotSummary extends StatelessWidget {
   const _PilotSummary({
     required this.patient,
+    required this.consents,
     required this.vitals,
     required this.alerts,
     required this.riskEvent,
@@ -1705,6 +1946,7 @@ class _PilotSummary extends StatelessWidget {
   });
 
   final Map<String, dynamic>? patient;
+  final List<Map<String, dynamic>> consents;
   final List<Map<String, dynamic>> vitals;
   final List<Map<String, dynamic>> alerts;
   final Map<String, dynamic>? riskEvent;
@@ -1717,6 +1959,8 @@ class _PilotSummary extends StatelessWidget {
     final rows = <String>[
       if (patient != null)
         'Patient: ${patient!['full_name']} (${patient!['id']})',
+      if (consents.isNotEmpty)
+        'Consents: ${consents.where((item) => item['status'] == 'active').length} active of ${consents.length}',
       if (vitals.isNotEmpty)
         'Vitals: ${vitals.map((item) => '${item['metric_code']} ${item['value']} ${item['unit']}').join(', ')}',
       if (alerts.isNotEmpty)

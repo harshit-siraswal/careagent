@@ -48,6 +48,12 @@ class CareAgentApiClient {
     return _items(payload);
   }
 
+  /// Lists consents for a patient.
+  Future<List<Map<String, dynamic>>> listConsents(String patientId) async {
+    final payload = await _request('GET', '/patients/$patientId/consents');
+    return _items(payload);
+  }
+
   /// Grants a patient consent.
   Future<Map<String, dynamic>> grantConsent({
     required String patientId,
@@ -63,6 +69,19 @@ class CareAgentApiClient {
         'consent_text_version': 'pilot-v1',
         'reason': 'pilot onboarding',
       },
+    );
+  }
+
+  /// Revokes a patient consent.
+  Future<Map<String, dynamic>> revokeConsent({
+    required String patientId,
+    required String consentId,
+    required String reason,
+  }) {
+    return _request(
+      'POST',
+      '/patients/$patientId/consents/$consentId/revoke',
+      body: {'reason': reason},
     );
   }
 

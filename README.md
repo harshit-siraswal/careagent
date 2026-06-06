@@ -9,16 +9,18 @@ This workspace contains the product and technical planning pack generated from:
 
 Read in this order:
 
-1. `docs/00-source-brief.md`
-2. `docs/01-prd.md`
-3. `docs/02-trd.md`
-4. `docs/03-device-integration-strategy.md`
-5. `docs/14-agent-runtime-selection.md`
-6. `docs/07-roadmap-and-workstreams.md`
-7. The relevant prompt from `prompts/`
+1. `docs/24-ai-system-architecture-and-project-handbook.md`
+2. `docs/00-source-brief.md`
+3. `docs/01-prd.md`
+4. `docs/02-trd.md`
+5. `docs/03-device-integration-strategy.md`
+6. `docs/14-agent-runtime-selection.md`
+7. `docs/07-roadmap-and-workstreams.md`
+8. The relevant prompt from `prompts/`
 
 ## Document Map
 
+- `docs/24-ai-system-architecture-and-project-handbook.md` - canonical system architecture, current implementation state, Supabase/Firebase decision, MVP build order, and AI context-reset handbook.
 - `docs/00-source-brief.md` - extracted deck understanding and updated product direction.
 - `docs/01-prd.md` - product requirements, user stories, scope, risk tiers, MVP.
 - `docs/02-trd.md` - technical architecture, components, APIs, reliability, testing.
@@ -39,6 +41,10 @@ Read in this order:
 - `docs/17-channels-calls-escalation-workstream.md` - WhatsApp, Telegram, push, SMS fallback, voice calls, provider abstraction, escalation state machine, templates, scripts, and simulation tests.
 - `docs/18-health-device-integrations-workstream.md` - HealthKit, Health Connect, BLE, device catalog, normalization, data quality, and simulator contracts.
 - `docs/19-remaining-work-report.md` - current implementation gap report across the app and backend repositories.
+- `docs/20-current-app-deployment-report.md` - current frontend/backend deployment state, active repo map, environment needs, and next deployment order.
+- `docs/21-production-readiness-audit-report.md` - production readiness audit, risk register, readiness phases, and next ten tasks.
+- `docs/22-frontend-uiux-motion-brand-audit.md` - frontend UI/UX, motion, brand, accessibility, and Caro experience audit.
+- `docs/23-uiux-brand-identity-and-caro-experience-system.md` - CareAgent visual identity, Caro companion behavior, voice, components, and experience principles.
 
 ## Backend Workstream Artifacts
 
@@ -49,6 +55,13 @@ Backend artifacts now live in the dedicated backend repository:
 - Supabase project: `careagent-backend` / `kgkfrrffrjfltswwcsmw` in `ap-south-1`
 
 Use that repo for backend API code, SQL migrations, OpenAPI contracts, channel/escalation contracts, and backend tests.
+
+## Project Work Packs
+
+Implementation-oriented work packs live under `project-work/`.
+
+- `project-work/remaining-work/README.md` - current execution queue derived from the newest handbook and gap reports.
+- `project-work/openclaw-agent/README.md` - OpenClaw prototype gateway and agent runtime deployment pack.
 
 ## Flutter App Scaffold
 
@@ -119,5 +132,7 @@ CareAgent should support "nearly all" devices through compatibility tiers, not b
 5. Manual entry, CSV, OCR, and photo fallback.
 
 ## Key Safety Decision
+
+Groq is the selected direct model provider for current in-app AI replies. Configure `GROQ_API_KEY` only on the backend deployment; the Flutter app must call CareAgent backend APIs and must never contain Groq provider keys.
 
 OpenClaw, PicoClaw, NVIDIA NemoClaw, or another selected runtime should orchestrate and explain, but safety-critical actions must be approved by deterministic backend policy. Calls, messages, location sharing, and emergency escalation require explicit consent, audit logging, and platform-compliant execution.

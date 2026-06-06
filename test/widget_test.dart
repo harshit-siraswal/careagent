@@ -17,8 +17,10 @@ void main() {
     await tester.pumpWidget(
       CareAgentApp(
         authController: CareAgentAuthController.previewUnconfigured(),
+        safetyNoticeStore: MemorySafetyNoticeStore(),
       ),
     );
+    await tester.pumpAndSettle();
 
     expect(find.text('CareAgent safety notice'), findsOneWidget);
     expect(find.text('CareAgent MVP Shell'), findsNothing);
@@ -29,8 +31,10 @@ void main() {
     await tester.pumpWidget(
       CareAgentApp(
         authController: CareAgentAuthController.previewUnconfigured(),
+        safetyNoticeStore: MemorySafetyNoticeStore(),
       ),
     );
+    await tester.pumpAndSettle();
 
     await tester.ensureVisible(find.text('I understand'));
     await tester.tap(find.text('I understand'));
@@ -46,14 +50,45 @@ void main() {
     expect(find.text('Sign in'), findsOneWidget);
   });
 
+  testWidgets('keeps safety notice accepted after app restart', (tester) async {
+    final store = MemorySafetyNoticeStore();
+
+    await tester.pumpWidget(
+      CareAgentApp(
+        authController: CareAgentAuthController.previewUnconfigured(),
+        safetyNoticeStore: store,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('I understand'));
+    await tester.tap(find.text('I understand'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('CareAgent safety notice'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(
+      CareAgentApp(
+        authController: CareAgentAuthController.previewUnconfigured(),
+        safetyNoticeStore: store,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('CareAgent safety notice'), findsNothing);
+    expect(find.text('Sign in to CareAgent'), findsOneWidget);
+  });
+
   testWidgets('navigates to core feature surfaces', (tester) async {
     await tester.pumpWidget(
       CareAgentApp(
         authController: CareAgentAuthController.previewSignedIn(
           email: 'patient@example.com',
         ),
+        safetyNoticeStore: MemorySafetyNoticeStore(),
       ),
     );
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('I understand'));
     await tester.tap(find.text('I understand'));
     await tester.pumpAndSettle();
