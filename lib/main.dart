@@ -1294,8 +1294,21 @@ class _CareAgentShell extends StatefulWidget {
 
 class _CareAgentShellState extends State<_CareAgentShell> {
   int _selectedIndex = 0;
+  late final _LocalCareState _localCareState;
 
   _Section get _selectedSection => _sections[_selectedIndex];
+
+  @override
+  void initState() {
+    super.initState();
+    _localCareState = _LocalCareState();
+  }
+
+  @override
+  void dispose() {
+    _localCareState.dispose();
+    super.dispose();
+  }
 
   void _selectSection(int index) {
     setState(() {
@@ -1307,20 +1320,23 @@ class _CareAgentShellState extends State<_CareAgentShell> {
   @override
   Widget build(BuildContext context) {
     final selectedSection = _selectedSection;
+    final showUserIdentity = MediaQuery.sizeOf(context).width >= 720;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(selectedSection.title),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: Center(
-              child: Text(
-                widget.userEmail ?? 'Signed in',
-                style: Theme.of(context).textTheme.labelLarge,
+          if (showUserIdentity)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Center(
+                child: Text(
+                  widget.userEmail ?? 'Signed in',
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
               ),
             ),
-          ),
           IconButton(
             tooltip: 'Sign out',
             onPressed: widget.onSignOut,
@@ -1344,9 +1360,13 @@ class _CareAgentShellState extends State<_CareAgentShell> {
       body: _selectedIndex == 0
           ? _HomeScreen(
               apiClient: widget.apiClient,
+              localCareState: _localCareState,
               onSelectSection: _selectSection,
             )
-          : _FeaturePreviewScreen(section: selectedSection),
+          : _CareFeatureScreen(
+              section: selectedSection,
+              careState: _localCareState,
+            ),
       floatingActionButton: _selectedIndex == _sosIndex
           ? null
           : FloatingActionButton.extended(
@@ -1391,9 +1411,14 @@ class _DrawerHeader extends StatelessWidget {
 }
 
 class _HomeScreen extends StatelessWidget {
-  const _HomeScreen({required this.apiClient, required this.onSelectSection});
+  const _HomeScreen({
+    required this.apiClient,
+    required this.localCareState,
+    required this.onSelectSection,
+  });
 
   final CareAgentApiClient apiClient;
+  final _LocalCareState localCareState;
   final ValueChanged<int> onSelectSection;
 
   @override
@@ -1422,6 +1447,7 @@ class _HomeScreen extends StatelessWidget {
               ? 'MVP actions use the configured Render API with Firebase ID tokens.'
               : 'Set CAREAGENT_API_BASE_URL at build time to enable live API calls.',
         ),
+        _LocalCareSnapshot(careState: localCareState),
         _PilotWorkspace(apiClient: apiClient),
         Text(
           'Setup areas',
@@ -1986,10 +2012,331 @@ class _PilotSummary extends StatelessWidget {
   }
 }
 
-class _FeaturePreviewScreen extends StatelessWidget {
-  const _FeaturePreviewScreen({required this.section});
+class _LocalCareState extends ChangeNotifier {
+  String patientName = 'Pilot Patient';
+  String language = 'English';
+  String careGoal = 'Keep vitals, medicines, and consent visible.';
+  String caretakerName = 'Family caretaker';
+  String caretakerPhone = '+91 90000 00000';
+  final Map<String, bool> consents = {
+    'Health data': false,
+    'Documents': false,
+    'Caretaker alerts': false,
+    'Simulation-only SOS': true,
+  };
+  final List<_LocalVital> vitals = [
+    _LocalVital(
+      metric: 'heart_rate',
+      value: '132',
+      unit: 'bpm',
+      source: 'manual',
+      observedAt: DateTime.now(),
+    ),
+  ];
+  final List<_LocalMedicine> medicines = [
+    _LocalMedicine(name: 'Metformin', schedule: '8:00 AM', status: 'due'),
+  ];
+  final List<_LocalDocument> documents = [
+    _LocalDocument(
+      name: 'Latest prescription.pdf',
+      kind: 'Prescription',
+      status: 'needs review',
+    ),
+  ];
+  final List<_LocalMessage> messages = [
+    _LocalMessage(
+      author: 'Caro',
+      body:
+          'I can summarize setup, consent, vitals, medicines, documents, and '
+          'simulation status. I do not diagnose or replace a clinician.',
+    ),
+  ];
+  final List<_LocalTimelineEvent> sosTimeline = [];
+  final List<_LocalChannel> channels = [
+    _LocalChannel(name: 'In-app push', enabled: true, verified: true),
+    _LocalChannel(name: 'WhatsApp', enabled: false, verified: false),
+    _LocalChannel(name: 'Telegram', enabled: false, verified: false),
+    _LocalChannel(name: 'Voice call', enabled: false, verified: false),
+  ];
+  final List<_LocalAlert> alerts = [
+    _LocalAlert(
+      title: 'High heart rate needs review',
+      body: 'Manual heart_rate reading is 132 bpm.',
+      severity: 'high',
+    ),
+  ];
+
+  int get activeConsentCount =>
+      consents.values.where((isActive) => isActive).length;
+
+  int get openAlertCount =>
+      alerts.where((alert) => alert.status == 'open').length;
+
+  bool get sosRunning =>
+      sosTimeline.any((event) => event.title == 'Simulation started');
+
+  void saveProfile({
+    required String name,
+    required String profileLanguage,
+    required String goal,
+    required String caretaker,
+    required String phone,
+  }) {
+    patientName = name.trim().isEmpty ? patientName : name.trim();
+    language = profileLanguage.trim().isEmpty
+        ? language
+        : profileLanguage.trim();
+    careGoal = goal.trim().isEmpty ? careGoal : goal.trim();
+    caretakerName = caretaker.trim().isEmpty ? caretakerName : caretaker.trim();
+    caretakerPhone = phone.trim().isEmpty ? caretakerPhone : phone.trim();
+    notifyListeners();
+  }
+
+  void setConsent(String key, bool value) {
+    consents[key] = value;
+    notifyListeners();
+  }
+
+  void addVital(String metric, String value, String unit) {
+    final vital = _LocalVital(
+      metric: metric.trim().isEmpty ? 'heart_rate' : metric.trim(),
+      value: value.trim().isEmpty ? '0' : value.trim(),
+      unit: unit.trim().isEmpty ? 'unit' : unit.trim(),
+      source: 'manual',
+      observedAt: DateTime.now(),
+    );
+    vitals.insert(0, vital);
+    final alert = _alertForVital(vital);
+    if (alert != null) alerts.insert(0, alert);
+    notifyListeners();
+  }
+
+  void addMedicine(String name, String schedule) {
+    medicines.insert(
+      0,
+      _LocalMedicine(
+        name: name.trim().isEmpty ? 'Medicine' : name.trim(),
+        schedule: schedule.trim().isEmpty ? 'Today' : schedule.trim(),
+        status: 'due',
+      ),
+    );
+    notifyListeners();
+  }
+
+  void markMedicineTaken(_LocalMedicine medicine) {
+    medicine.status = 'taken';
+    notifyListeners();
+  }
+
+  void addDocument(String name, String kind) {
+    documents.insert(
+      0,
+      _LocalDocument(
+        name: name.trim().isEmpty ? 'care-record.pdf' : name.trim(),
+        kind: kind.trim().isEmpty ? 'Medical record' : kind.trim(),
+        status: 'needs review',
+      ),
+    );
+    notifyListeners();
+  }
+
+  void markDocumentReviewed(_LocalDocument document) {
+    document.status = 'reviewed';
+    notifyListeners();
+  }
+
+  void sendMessage(String body) {
+    final text = body.trim();
+    if (text.isEmpty) return;
+    messages.add(_LocalMessage(author: 'You', body: text));
+    messages.add(_LocalMessage(author: 'Caro', body: _replyFor(text)));
+    notifyListeners();
+  }
+
+  void startSosSimulation() {
+    sosTimeline
+      ..clear()
+      ..add(
+        _LocalTimelineEvent(
+          title: 'Simulation started',
+          body: 'No real emergency service or provider was contacted.',
+        ),
+      )
+      ..add(
+        _LocalTimelineEvent(
+          title: 'Patient prompt',
+          body: 'CareAgent would ask for confirmation before escalation.',
+        ),
+      )
+      ..add(
+        _LocalTimelineEvent(
+          title: 'Caretaker draft ready',
+          body: 'A reviewed, AI-disclosed message is ready for approval.',
+        ),
+      );
+    alerts.insert(
+      0,
+      _LocalAlert(
+        title: 'SOS simulation awaiting acknowledgement',
+        body: 'This is a test run only.',
+        severity: 'moderate',
+      ),
+    );
+    notifyListeners();
+  }
+
+  void acknowledgeSos() {
+    sosTimeline.add(
+      _LocalTimelineEvent(
+        title: 'Acknowledged',
+        body: '$caretakerName acknowledged the simulated escalation.',
+      ),
+    );
+    for (final alert in alerts) {
+      if (alert.title.contains('SOS simulation')) {
+        alert.status = 'acknowledged';
+      }
+    }
+    notifyListeners();
+  }
+
+  void setChannelEnabled(_LocalChannel channel, bool enabled) {
+    channel.enabled = enabled;
+    if (enabled) channel.verified = true;
+    notifyListeners();
+  }
+
+  void acknowledgeAlert(_LocalAlert alert) {
+    alert.status = 'acknowledged';
+    notifyListeners();
+  }
+
+  _LocalAlert? _alertForVital(_LocalVital vital) {
+    final number = num.tryParse(vital.value);
+    if (number == null) return null;
+    if (vital.metric == 'heart_rate' && (number >= 130 || number <= 45)) {
+      return _LocalAlert(
+        title: 'Heart rate needs review',
+        body: 'Manual heart_rate reading is ${vital.value} ${vital.unit}.',
+        severity: 'high',
+      );
+    }
+    if (vital.metric == 'spo2' && number <= 92) {
+      return _LocalAlert(
+        title: 'Low oxygen needs review',
+        body: 'Manual SpO2 reading is ${vital.value}${vital.unit}.',
+        severity: number <= 88 ? 'critical' : 'high',
+      );
+    }
+    return null;
+  }
+
+  String _replyFor(String text) {
+    final lowered = text.toLowerCase();
+    if (lowered.contains('medicine')) {
+      return 'I found ${medicines.length} medicine item(s). Review schedules '
+          'before enabling reminders.';
+    }
+    if (lowered.contains('vital') || lowered.contains('heart')) {
+      final latest = vitals.isEmpty ? null : vitals.first;
+      return latest == null
+          ? 'No vitals are recorded yet.'
+          : 'Latest ${latest.metric} is ${latest.value} ${latest.unit} from '
+                '${latest.source}. Contact a clinician for severe symptoms.';
+    }
+    if (lowered.contains('sos') || lowered.contains('emergency')) {
+      return 'For a real emergency, contact local emergency services now. '
+          'The CareAgent SOS flow here is simulation-only.';
+    }
+    return 'I can help organize your setup. Current profile: $patientName, '
+        '$activeConsentCount active consent(s), and $openAlertCount open alert(s).';
+  }
+}
+
+class _LocalVital {
+  _LocalVital({
+    required this.metric,
+    required this.value,
+    required this.unit,
+    required this.source,
+    required this.observedAt,
+  });
+
+  final String metric;
+  final String value;
+  final String unit;
+  final String source;
+  final DateTime observedAt;
+}
+
+class _LocalMedicine {
+  _LocalMedicine({
+    required this.name,
+    required this.schedule,
+    required this.status,
+  });
+
+  final String name;
+  final String schedule;
+  String status;
+}
+
+class _LocalDocument {
+  _LocalDocument({
+    required this.name,
+    required this.kind,
+    required this.status,
+  });
+
+  final String name;
+  final String kind;
+  String status;
+}
+
+class _LocalMessage {
+  _LocalMessage({required this.author, required this.body});
+
+  final String author;
+  final String body;
+}
+
+class _LocalTimelineEvent {
+  _LocalTimelineEvent({required this.title, required this.body});
+
+  final String title;
+  final String body;
+}
+
+class _LocalChannel {
+  _LocalChannel({
+    required this.name,
+    required this.enabled,
+    required this.verified,
+  });
+
+  final String name;
+  bool enabled;
+  bool verified;
+}
+
+class _LocalAlert {
+  _LocalAlert({
+    required this.title,
+    required this.body,
+    required this.severity,
+  });
+
+  final String title;
+  final String body;
+  final String severity;
+  String status = 'open';
+}
+
+class _CareFeatureScreen extends StatelessWidget {
+  const _CareFeatureScreen({required this.section, required this.careState});
 
   final _Section section;
+  final _LocalCareState careState;
 
   @override
   Widget build(BuildContext context) {
@@ -2003,8 +2350,7 @@ class _FeaturePreviewScreen extends StatelessWidget {
           message: section.shortLabel,
         ),
         _SafetyBanner(title: section.noticeTitle, message: section.notice),
-        for (final item in section.items)
-          _InfoTile(icon: item.icon, title: item.title, body: item.body),
+        _FeatureBody(section: section, careState: careState),
       ],
     );
   }
@@ -2013,6 +2359,7 @@ class _FeaturePreviewScreen extends StatelessWidget {
     return switch (title) {
       'Consent' => CaroState.concerned,
       'Vitals' => CaroState.listening,
+      'Alerts' => CaroState.concerned,
       'Chat' => CaroState.listening,
       'SOS' => CaroState.simulation,
       'Documents' => CaroState.handoff,
@@ -2024,11 +2371,628 @@ class _FeaturePreviewScreen extends StatelessWidget {
     return switch (title) {
       'Consent' => 'Caro keeps consent visible',
       'Vitals' => 'Caro checks source and freshness',
+      'Alerts' => 'Caro separates open and acknowledged alerts',
       'Chat' => 'Caro answers with boundaries',
       'SOS' => 'Caro keeps this in simulation mode',
       'Documents' => 'Caro waits for reviewed sources',
       _ => 'Caro guides this setup area',
     };
+  }
+}
+
+class _FeatureBody extends StatelessWidget {
+  const _FeatureBody({required this.section, required this.careState});
+
+  final _Section section;
+  final _LocalCareState careState;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: careState,
+      builder: (context, _) {
+        return switch (section.title) {
+          'Onboarding' => _OnboardingFeature(careState: careState),
+          'Consent' => _ConsentFeature(careState: careState),
+          'Vitals' => _VitalsFeature(careState: careState),
+          'Medicines' => _MedicinesFeature(careState: careState),
+          'Documents' => _DocumentsFeature(careState: careState),
+          'Chat' => _ChatFeature(careState: careState),
+          'SOS' => _SosFeature(careState: careState),
+          'Caretaker' => _CaretakerFeature(careState: careState),
+          'Channels' => _ChannelsFeature(careState: careState),
+          'Alerts' => _AlertsFeature(careState: careState),
+          _ => Column(
+            children: [
+              for (final item in section.items)
+                _InfoTile(icon: item.icon, title: item.title, body: item.body),
+            ],
+          ),
+        };
+      },
+    );
+  }
+}
+
+class _LocalCareSnapshot extends StatelessWidget {
+  const _LocalCareSnapshot({required this.careState});
+
+  final _LocalCareState careState;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: careState,
+      builder: (context, _) {
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _StatusChip(
+              icon: Icons.person_outline,
+              label: careState.patientName,
+            ),
+            _StatusChip(
+              icon: Icons.verified_user_outlined,
+              label: '${careState.activeConsentCount} consent(s)',
+            ),
+            _StatusChip(
+              icon: Icons.monitor_heart_outlined,
+              label: '${careState.vitals.length} vital(s)',
+            ),
+            _StatusChip(
+              icon: Icons.notification_important_outlined,
+              label: '${careState.openAlertCount} open alert(s)',
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      avatar: Icon(icon, size: 18),
+      label: Text(label),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+}
+
+class _OnboardingFeature extends StatefulWidget {
+  const _OnboardingFeature({required this.careState});
+
+  final _LocalCareState careState;
+
+  @override
+  State<_OnboardingFeature> createState() => _OnboardingFeatureState();
+}
+
+class _OnboardingFeatureState extends State<_OnboardingFeature> {
+  late final _name = TextEditingController(text: widget.careState.patientName);
+  late final _language = TextEditingController(text: widget.careState.language);
+  late final _goal = TextEditingController(text: widget.careState.careGoal);
+  late final _caretaker = TextEditingController(
+    text: widget.careState.caretakerName,
+  );
+  late final _phone = TextEditingController(
+    text: widget.careState.caretakerPhone,
+  );
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _language.dispose();
+    _goal.dispose();
+    _caretaker.dispose();
+    _phone.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _FormGrid(
+          children: [
+            _PilotTextField(
+              controller: _name,
+              label: 'Patient name',
+              icon: Icons.person_outline,
+            ),
+            _PilotTextField(
+              controller: _language,
+              label: 'Primary language',
+              icon: Icons.translate_outlined,
+            ),
+            _PilotTextField(
+              controller: _caretaker,
+              label: 'Primary caretaker',
+              icon: Icons.group_outlined,
+            ),
+            _PilotTextField(
+              controller: _phone,
+              label: 'Caretaker phone',
+              icon: Icons.phone_outlined,
+            ),
+          ],
+        ),
+        _PilotTextField(
+          controller: _goal,
+          label: 'Care goal',
+          icon: Icons.flag_outlined,
+        ),
+        const SizedBox(height: 8),
+        FilledButton.icon(
+          onPressed: () {
+            widget.careState.saveProfile(
+              name: _name.text,
+              profileLanguage: _language.text,
+              goal: _goal.text,
+              caretaker: _caretaker.text,
+              phone: _phone.text,
+            );
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Profile saved locally.')),
+            );
+          },
+          icon: const Icon(Icons.save_outlined),
+          label: const Text('Save Profile'),
+        ),
+        const SizedBox(height: 12),
+        _InfoTile(
+          icon: Icons.badge_outlined,
+          title: widget.careState.patientName,
+          body:
+              '${widget.careState.language}. ${widget.careState.careGoal}\n'
+              'Primary caretaker: ${widget.careState.caretakerName}, '
+              '${widget.careState.caretakerPhone}',
+        ),
+      ],
+    );
+  }
+}
+
+class _ConsentFeature extends StatelessWidget {
+  const _ConsentFeature({required this.careState});
+
+  final _LocalCareState careState;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (final entry in careState.consents.entries)
+          SwitchListTile(
+            value: entry.value,
+            onChanged: (value) => careState.setConsent(entry.key, value),
+            secondary: Icon(
+              entry.value
+                  ? Icons.verified_user_outlined
+                  : Icons.privacy_tip_outlined,
+            ),
+            title: Text(entry.key),
+            subtitle: Text(
+              entry.value
+                  ? 'Active for this local pilot workspace.'
+                  : 'Disabled. Related actions stay blocked or simulation-only.',
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _VitalsFeature extends StatefulWidget {
+  const _VitalsFeature({required this.careState});
+
+  final _LocalCareState careState;
+
+  @override
+  State<_VitalsFeature> createState() => _VitalsFeatureState();
+}
+
+class _VitalsFeatureState extends State<_VitalsFeature> {
+  final _metric = TextEditingController(text: 'heart_rate');
+  final _value = TextEditingController(text: '132');
+  final _unit = TextEditingController(text: 'bpm');
+
+  @override
+  void dispose() {
+    _metric.dispose();
+    _value.dispose();
+    _unit.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _FormGrid(
+          children: [
+            _PilotTextField(
+              controller: _metric,
+              label: 'Metric',
+              icon: Icons.monitor_heart_outlined,
+            ),
+            _PilotTextField(
+              controller: _value,
+              label: 'Value',
+              icon: Icons.speed_outlined,
+            ),
+            _PilotTextField(
+              controller: _unit,
+              label: 'Unit',
+              icon: Icons.straighten_outlined,
+            ),
+          ],
+        ),
+        FilledButton.icon(
+          onPressed: () =>
+              widget.careState.addVital(_metric.text, _value.text, _unit.text),
+          icon: const Icon(Icons.add_chart_outlined),
+          label: const Text('Add Manual Reading'),
+        ),
+        const SizedBox(height: 12),
+        for (final vital in widget.careState.vitals)
+          _InfoTile(
+            icon: Icons.favorite_outline,
+            title: '${vital.metric}: ${vital.value} ${vital.unit}',
+            body:
+                'Source: ${vital.source}. Freshness: fresh. Observed at '
+                '${TimeOfDay.fromDateTime(vital.observedAt).format(context)}.',
+          ),
+      ],
+    );
+  }
+}
+
+class _MedicinesFeature extends StatefulWidget {
+  const _MedicinesFeature({required this.careState});
+
+  final _LocalCareState careState;
+
+  @override
+  State<_MedicinesFeature> createState() => _MedicinesFeatureState();
+}
+
+class _MedicinesFeatureState extends State<_MedicinesFeature> {
+  final _name = TextEditingController(text: 'Amlodipine');
+  final _schedule = TextEditingController(text: '9:00 PM');
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _schedule.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _FormGrid(
+          children: [
+            _PilotTextField(
+              controller: _name,
+              label: 'Medicine',
+              icon: Icons.medication_outlined,
+            ),
+            _PilotTextField(
+              controller: _schedule,
+              label: 'Schedule',
+              icon: Icons.alarm_outlined,
+            ),
+          ],
+        ),
+        FilledButton.icon(
+          onPressed: () =>
+              widget.careState.addMedicine(_name.text, _schedule.text),
+          icon: const Icon(Icons.add_outlined),
+          label: const Text('Add Medicine'),
+        ),
+        const SizedBox(height: 12),
+        for (final medicine in widget.careState.medicines)
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.medication_outlined),
+              title: Text(medicine.name),
+              subtitle: Text('${medicine.schedule} - ${medicine.status}'),
+              trailing: medicine.status == 'taken'
+                  ? const Icon(Icons.check_circle_outline)
+                  : TextButton(
+                      onPressed: () =>
+                          widget.careState.markMedicineTaken(medicine),
+                      child: const Text('Taken'),
+                    ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _DocumentsFeature extends StatefulWidget {
+  const _DocumentsFeature({required this.careState});
+
+  final _LocalCareState careState;
+
+  @override
+  State<_DocumentsFeature> createState() => _DocumentsFeatureState();
+}
+
+class _DocumentsFeatureState extends State<_DocumentsFeature> {
+  final _name = TextEditingController(text: 'blood-report.pdf');
+  final _kind = TextEditingController(text: 'Lab report');
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _kind.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _FormGrid(
+          children: [
+            _PilotTextField(
+              controller: _name,
+              label: 'File name',
+              icon: Icons.description_outlined,
+            ),
+            _PilotTextField(
+              controller: _kind,
+              label: 'Document type',
+              icon: Icons.category_outlined,
+            ),
+          ],
+        ),
+        FilledButton.icon(
+          onPressed: () => widget.careState.addDocument(_name.text, _kind.text),
+          icon: const Icon(Icons.upload_file_outlined),
+          label: const Text('Add Document Record'),
+        ),
+        const SizedBox(height: 12),
+        for (final document in widget.careState.documents)
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.description_outlined),
+              title: Text(document.name),
+              subtitle: Text('${document.kind} - ${document.status}'),
+              trailing: document.status == 'reviewed'
+                  ? const Icon(Icons.fact_check_outlined)
+                  : TextButton(
+                      onPressed: () =>
+                          widget.careState.markDocumentReviewed(document),
+                      child: const Text('Mark reviewed'),
+                    ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ChatFeature extends StatefulWidget {
+  const _ChatFeature({required this.careState});
+
+  final _LocalCareState careState;
+
+  @override
+  State<_ChatFeature> createState() => _ChatFeatureState();
+}
+
+class _ChatFeatureState extends State<_ChatFeature> {
+  final _message = TextEditingController(text: 'What is my latest vital?');
+
+  @override
+  void dispose() {
+    _message.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final message in widget.careState.messages)
+          Align(
+            alignment: message.author == 'You'
+                ? Alignment.centerRight
+                : Alignment.centerLeft,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text('${message.author}: ${message.body}'),
+                ),
+              ),
+            ),
+          ),
+        _PilotTextField(
+          controller: _message,
+          label: 'Ask Caro',
+          icon: Icons.chat_bubble_outline,
+        ),
+        const SizedBox(height: 8),
+        FilledButton.icon(
+          onPressed: () {
+            widget.careState.sendMessage(_message.text);
+            _message.clear();
+          },
+          icon: const Icon(Icons.send_outlined),
+          label: const Text('Send'),
+        ),
+      ],
+    );
+  }
+}
+
+class _SosFeature extends StatelessWidget {
+  const _SosFeature({required this.careState});
+
+  final _LocalCareState careState;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilledButton.icon(
+              onPressed: careState.startSosSimulation,
+              icon: const Icon(Icons.emergency_outlined),
+              label: Text(
+                careState.sosRunning
+                    ? 'Restart Simulation'
+                    : 'Start Simulation',
+              ),
+            ),
+            OutlinedButton.icon(
+              onPressed: careState.sosTimeline.isEmpty
+                  ? null
+                  : careState.acknowledgeSos,
+              icon: const Icon(Icons.check_circle_outline),
+              label: const Text('Acknowledge'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        for (final event in careState.sosTimeline)
+          _InfoTile(
+            icon: Icons.timeline_outlined,
+            title: event.title,
+            body: event.body,
+          ),
+        if (careState.sosTimeline.isEmpty)
+          const Text('No simulation has been started yet.'),
+      ],
+    );
+  }
+}
+
+class _CaretakerFeature extends StatelessWidget {
+  const _CaretakerFeature({required this.careState});
+
+  final _LocalCareState careState;
+
+  @override
+  Widget build(BuildContext context) {
+    return _InfoTile(
+      icon: Icons.contact_phone_outlined,
+      title: careState.caretakerName,
+      body:
+          '${careState.caretakerPhone}\nRole: primary caretaker\n'
+          'Can acknowledge alerts after consent is active.',
+    );
+  }
+}
+
+class _ChannelsFeature extends StatelessWidget {
+  const _ChannelsFeature({required this.careState});
+
+  final _LocalCareState careState;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (final channel in careState.channels)
+          SwitchListTile(
+            value: channel.enabled,
+            onChanged: (value) => careState.setChannelEnabled(channel, value),
+            secondary: Icon(
+              channel.verified
+                  ? Icons.mark_email_read_outlined
+                  : Icons.mark_email_unread_outlined,
+            ),
+            title: Text(channel.name),
+            subtitle: Text(
+              channel.verified
+                  ? 'Verified for simulation workflow.'
+                  : 'Not verified. Toggle to simulate verification.',
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _AlertsFeature extends StatelessWidget {
+  const _AlertsFeature({required this.careState});
+
+  final _LocalCareState careState;
+
+  @override
+  Widget build(BuildContext context) {
+    if (careState.alerts.isEmpty) {
+      return const Text('No alerts yet. Add an abnormal vital or run SOS.');
+    }
+    return Column(
+      children: [
+        for (final alert in careState.alerts)
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.notification_important_outlined),
+              title: Text(alert.title),
+              subtitle: Text(
+                '${alert.severity} - ${alert.status}\n${alert.body}',
+              ),
+              trailing: alert.status == 'open'
+                  ? TextButton(
+                      onPressed: () => careState.acknowledgeAlert(alert),
+                      child: const Text('Ack'),
+                    )
+                  : const Icon(Icons.check_circle_outline),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _FormGrid extends StatelessWidget {
+  const _FormGrid({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth >= 640
+            ? (constraints.maxWidth - 12) / 2
+            : constraints.maxWidth;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            for (final child in children) SizedBox(width: width, child: child),
+          ],
+        );
+      },
+    );
   }
 }
 
@@ -2497,6 +3461,90 @@ const _sections = <_Section>[
         body:
             'Drills must be clearly labeled as test mode and must '
             'never call real emergency services.',
+      ),
+    ],
+  ),
+  _Section(
+    title: 'Caretaker',
+    heading: 'Caretaker',
+    shortLabel: 'Primary support contact',
+    description: 'Acknowledge-ready caretaker profile for local pilot flows.',
+    noticeTitle: 'Caretaker access requires consent',
+    notice:
+        'Contacts can receive simulation alerts only after consent and '
+        'verification are active.',
+    icon: Icons.contact_phone_outlined,
+    selectedIcon: Icons.contact_phone,
+    items: [
+      _InfoItem(
+        icon: Icons.person_pin_circle_outlined,
+        title: 'Primary caretaker',
+        body:
+            'Shows the currently configured caretaker and phone number '
+            'from onboarding.',
+      ),
+      _InfoItem(
+        icon: Icons.check_circle_outline,
+        title: 'Acknowledgement',
+        body:
+            'Alerts can be acknowledged in the app without implying '
+            'clinical resolution.',
+      ),
+    ],
+  ),
+  _Section(
+    title: 'Channels',
+    heading: 'Channels',
+    shortLabel: 'Notification readiness',
+    description: 'In-app, WhatsApp, Telegram, and voice channel toggles.',
+    noticeTitle: 'External channels are simulated',
+    notice:
+        'Toggles here simulate readiness only. Real messaging requires '
+        'provider setup, consent, and audit logging.',
+    icon: Icons.settings_input_antenna_outlined,
+    selectedIcon: Icons.settings_input_antenna,
+    items: [
+      _InfoItem(
+        icon: Icons.mark_email_read_outlined,
+        title: 'Verification',
+        body:
+            'Channels show verified or unverified status before they can '
+            'participate in escalation.',
+      ),
+      _InfoItem(
+        icon: Icons.rule_outlined,
+        title: 'Policy gate',
+        body:
+            'Outbound messages need explicit patient intent and AI '
+            'disclosure.',
+      ),
+    ],
+  ),
+  _Section(
+    title: 'Alerts',
+    heading: 'Alerts',
+    shortLabel: 'Open and acknowledged events',
+    description: 'Manual vitals and SOS simulations produce local alerts.',
+    noticeTitle: 'Alerts are not diagnoses',
+    notice:
+        'Open alerts indicate review needs. They do not diagnose, clear, '
+        'or replace clinician guidance.',
+    icon: Icons.notification_important_outlined,
+    selectedIcon: Icons.notification_important,
+    items: [
+      _InfoItem(
+        icon: Icons.monitor_heart_outlined,
+        title: 'Vital thresholds',
+        body:
+            'Abnormal manual readings create review alerts with severity '
+            'and source context.',
+      ),
+      _InfoItem(
+        icon: Icons.done_all_outlined,
+        title: 'Acknowledgement',
+        body:
+            'Acknowledging records that someone saw the alert; it does '
+            'not mark the patient as healthy.',
       ),
     ],
   ),

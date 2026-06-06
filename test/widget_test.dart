@@ -111,4 +111,74 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('signed-in care features update local pilot state', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      CareAgentApp(
+        authController: CareAgentAuthController.previewSignedIn(
+          email: 'patient@example.com',
+        ),
+        safetyNoticeStore: MemorySafetyNoticeStore(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('I understand'));
+    await tester.tap(find.text('I understand'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithText(NavigationDrawerDestination, 'Vitals'),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('heart_rate: 132 bpm'), findsOneWidget);
+    await tester.tap(find.text('Add Manual Reading'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(NavigationDrawerDestination, 'Chat'));
+    await tester.pumpAndSettle();
+    final sendButton = find.text('Send');
+    await tester.drag(find.byType(Scrollable).last, const Offset(0, -180));
+    await tester.pumpAndSettle();
+    await tester.tap(sendButton);
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('You: What is my latest vital?'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Latest heart_rate is 132 bpm'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(NavigationDrawerDestination, 'SOS'));
+    await tester.pumpAndSettle();
+    final startSimulationButton = find.text('Start Simulation');
+    await tester.ensureVisible(startSimulationButton);
+    await tester.pumpAndSettle();
+    await tester.tap(startSimulationButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Simulation started'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithText(NavigationDrawerDestination, 'Alerts'),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Heart rate needs review'), findsOneWidget);
+    expect(
+      find.text('SOS simulation awaiting acknowledgement'),
+      findsOneWidget,
+    );
+  });
 }
