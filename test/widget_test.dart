@@ -102,7 +102,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Consent Center'), findsOneWidget);
-    expect(find.text('No consent has been granted'), findsOneWidget);
+    expect(find.text('Consent is separated by purpose'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.emergency_outlined).first);
     await tester.pumpAndSettle();
@@ -177,7 +177,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Heart rate needs review'), findsOneWidget);
     expect(
-      find.text('SOS simulation awaiting acknowledgement'),
+      find.text('Multi-channel escalation awaiting acknowledgement'),
       findsOneWidget,
     );
   });

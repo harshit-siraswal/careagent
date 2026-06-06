@@ -1320,7 +1320,9 @@ class _CareAgentShellState extends State<_CareAgentShell> {
   @override
   Widget build(BuildContext context) {
     final selectedSection = _selectedSection;
-    final showUserIdentity = MediaQuery.sizeOf(context).width >= 720;
+    final width = MediaQuery.sizeOf(context).width;
+    final showUserIdentity = width >= 720;
+    final compactFab = width < 480;
 
     return Scaffold(
       appBar: AppBar(
@@ -1369,6 +1371,12 @@ class _CareAgentShellState extends State<_CareAgentShell> {
             ),
       floatingActionButton: _selectedIndex == _sosIndex
           ? null
+          : compactFab
+          ? FloatingActionButton(
+              tooltip: 'SOS',
+              onPressed: () => _selectSection(_sosIndex),
+              child: const Icon(Icons.emergency_outlined),
+            )
           : FloatingActionButton.extended(
               onPressed: () => _selectSection(_sosIndex),
               icon: const Icon(Icons.emergency_outlined),
@@ -1448,6 +1456,7 @@ class _HomeScreen extends StatelessWidget {
               : 'Set CAREAGENT_API_BASE_URL at build time to enable live API calls.',
         ),
         _LocalCareSnapshot(careState: localCareState),
+        _HackathonDemoPanel(careState: localCareState),
         _PilotWorkspace(apiClient: apiClient),
         Text(
           'Setup areas',
@@ -2013,15 +2022,25 @@ class _PilotSummary extends StatelessWidget {
 }
 
 class _LocalCareState extends ChangeNotifier {
-  String patientName = 'Pilot Patient';
-  String language = 'English';
-  String careGoal = 'Keep vitals, medicines, and consent visible.';
-  String caretakerName = 'Family caretaker';
-  String caretakerPhone = '+91 90000 00000';
+  String patientName = 'Ravi Sharma';
+  String language = 'Hindi + English';
+  String ageAndLocation = '68 years, Noida Sector 62';
+  String careGoal =
+      'Diabetes and hypertension support with caretaker escalation.';
+  String emergencyAddress = 'Tower B, Sunrise Residency, Sector 62, Noida, UP';
+  String conditions = 'Type 2 diabetes, hypertension, post-stent follow-up';
+  String allergies = 'Penicillin';
+  String caretakerName = 'Meera Sharma';
+  String caretakerPhone = '+91 98765 43210';
   final Map<String, bool> consents = {
-    'Health data': false,
-    'Documents': false,
-    'Caretaker alerts': false,
+    'Health data': true,
+    'Documents': true,
+    'Caretaker access': true,
+    'WhatsApp alerts': true,
+    'Telegram alerts': true,
+    'Voice calls': true,
+    'Location sharing': false,
+    'Emergency automation': false,
     'Simulation-only SOS': true,
   };
   final List<_LocalVital> vitals = [
@@ -2029,40 +2048,303 @@ class _LocalCareState extends ChangeNotifier {
       metric: 'heart_rate',
       value: '132',
       unit: 'bpm',
-      source: 'manual',
-      observedAt: DateTime.now(),
+      source: 'Watch BLE simulator',
+      observedAt: DateTime.now().subtract(const Duration(minutes: 3)),
+      freshness: 'fresh',
+      status: 'critical',
+    ),
+    _LocalVital(
+      metric: 'spo2',
+      value: '91',
+      unit: '%',
+      source: 'Pulse oximeter',
+      observedAt: DateTime.now().subtract(const Duration(minutes: 4)),
+      freshness: 'fresh',
+      status: 'high',
+    ),
+    _LocalVital(
+      metric: 'blood_pressure',
+      value: '165/98',
+      unit: 'mmHg',
+      source: 'Manual cuff',
+      observedAt: DateTime.now().subtract(const Duration(minutes: 18)),
+      freshness: 'fresh',
+      status: 'high',
+    ),
+    _LocalVital(
+      metric: 'glucose',
+      value: '188',
+      unit: 'mg/dL',
+      source: 'Prescription OCR fallback',
+      observedAt: DateTime.now().subtract(const Duration(hours: 2)),
+      freshness: 'reviewed',
+      status: 'moderate',
     ),
   ];
   final List<_LocalMedicine> medicines = [
-    _LocalMedicine(name: 'Metformin', schedule: '8:00 AM', status: 'due'),
+    _LocalMedicine(
+      name: 'Metformin',
+      dose: '500 mg',
+      schedule: 'After breakfast',
+      status: 'taken',
+      source: 'Reviewed prescription',
+    ),
+    _LocalMedicine(
+      name: 'Telmisartan',
+      dose: '40 mg',
+      schedule: '9:00 PM',
+      status: 'due in 38 min',
+      source: 'Reviewed prescription',
+    ),
+    _LocalMedicine(
+      name: 'Atorvastatin',
+      dose: '20 mg',
+      schedule: '10:00 PM',
+      status: 'scheduled',
+      source: 'Doctor discharge note',
+    ),
+    _LocalMedicine(
+      name: 'Aspirin',
+      dose: '75 mg',
+      schedule: 'After dinner',
+      status: 'caregiver review',
+      source: 'Low-confidence OCR',
+    ),
   ];
   final List<_LocalDocument> documents = [
     _LocalDocument(
-      name: 'Latest prescription.pdf',
+      name: 'Cardiology prescription - May 2026.pdf',
       kind: 'Prescription',
+      status: 'reviewed',
+      source: 'Uploaded in app',
+      extractedFacts: [
+        'Metformin 500 mg after breakfast',
+        'Telmisartan 40 mg at night',
+        'Follow-up in 14 days',
+      ],
+    ),
+    _LocalDocument(
+      name: 'WhatsApp lab report photo.jpg',
+      kind: 'Lab report',
       status: 'needs review',
+      source: 'WhatsApp channel upload',
+      extractedFacts: ['HbA1c 7.8%', 'Creatinine 1.1 mg/dL', 'LDL 112 mg/dL'],
+    ),
+    _LocalDocument(
+      name: 'Discharge summary - stent follow-up.pdf',
+      kind: 'Discharge summary',
+      status: 'source-linked',
+      source: 'Caretaker upload',
+      extractedFacts: [
+        'Stent follow-up completed',
+        'Avoid missed BP medicine',
+        'Call cardiologist if chest pain occurs',
+      ],
     ),
   ];
   final List<_LocalMessage> messages = [
     _LocalMessage(
       author: 'Caro',
       body:
-          'I can summarize setup, consent, vitals, medicines, documents, and '
-          'simulation status. I do not diagnose or replace a clinician.',
+          'Demo context loaded for Ravi Sharma. I can explain vitals, '
+          'medicine schedule, reviewed documents, and the simulated '
+          'WhatsApp/Telegram/voice escalation plan.',
+    ),
+    _LocalMessage(
+      author: 'Caro',
+      body:
+          'Critical demo alert: heart_rate 132 bpm and SpO2 91% are recent. '
+          'CareAgent will notify verified contacts in simulation mode and '
+          'will not call real emergency services.',
     ),
   ];
-  final List<_LocalTimelineEvent> sosTimeline = [];
+  final List<_LocalContact> contacts = [
+    _LocalContact(
+      name: 'Meera Sharma',
+      role: 'Primary caretaker',
+      relation: 'Daughter',
+      phone: '+91 98765 43210',
+      priority: 1,
+      channels: ['Push', 'WhatsApp', 'Voice'],
+      verification: 'verified',
+      consent: 'active',
+      lastAction: 'Acknowledged medicine reminder 1h ago',
+    ),
+    _LocalContact(
+      name: 'Amit Sharma',
+      role: 'Secondary caretaker',
+      relation: 'Son',
+      phone: '+91 99887 77665',
+      priority: 2,
+      channels: ['Telegram', 'Voice'],
+      verification: 'verified',
+      consent: 'active',
+      lastAction: 'Telegram linked for alerts',
+    ),
+    _LocalContact(
+      name: 'Dr. Neha Verma',
+      role: 'Cardiologist',
+      relation: 'Doctor',
+      phone: '+91 91234 56780',
+      priority: 3,
+      channels: ['WhatsApp', 'Voice'],
+      verification: 'clinic verified',
+      consent: 'minimum PHI',
+      lastAction: 'Receives escalation summaries only',
+    ),
+    _LocalContact(
+      name: 'CarePlus Ambulance Desk',
+      role: 'Private ambulance',
+      relation: 'Emergency service',
+      phone: '+91 1800 555 221',
+      priority: 4,
+      channels: ['Voice'],
+      verification: 'contract pending',
+      consent: 'disabled in demo',
+      lastAction: 'MVP requires legal/provider approval',
+    ),
+  ];
+  final List<_LocalTimelineEvent> sosTimeline = [
+    _LocalTimelineEvent(
+      title: 'Critical vitals detected',
+      body:
+          'Watch BLE simulator reported heart_rate 132 bpm; pulse oximeter '
+          'reported SpO2 91%. Evidence is recent and source-labelled.',
+    ),
+    _LocalTimelineEvent(
+      title: 'Policy gate passed for simulation',
+      body:
+          'Health data, caretaker, WhatsApp, Telegram, voice, and simulation '
+          'consents are active. Real emergency automation is disabled.',
+    ),
+  ];
   final List<_LocalChannel> channels = [
-    _LocalChannel(name: 'In-app push', enabled: true, verified: true),
-    _LocalChannel(name: 'WhatsApp', enabled: false, verified: false),
-    _LocalChannel(name: 'Telegram', enabled: false, verified: false),
-    _LocalChannel(name: 'Voice call', enabled: false, verified: false),
+    _LocalChannel(
+      name: 'In-app push',
+      provider: 'FCM/APNs',
+      readiness: 'ready',
+      enabled: true,
+      verified: true,
+      contacts: 'Patient app + Meera device',
+      mode: 'sandbox-ready',
+      nextStep: 'Add production Firebase sender credentials.',
+      template: 'urgent_vitals_alert_v1',
+    ),
+    _LocalChannel(
+      name: 'WhatsApp',
+      provider: 'Cloud API or approved BSP',
+      readiness: 'template plan ready',
+      enabled: true,
+      verified: true,
+      contacts: 'Meera, Dr. Neha',
+      mode: 'simulation now',
+      nextStep:
+          'Need WABA, approved alert templates, webhook secret, phone ID.',
+      template: 'critical_escalation_caretaker_v1',
+    ),
+    _LocalChannel(
+      name: 'Telegram',
+      provider: 'Telegram Bot API',
+      readiness: 'linked pilot contact',
+      enabled: true,
+      verified: true,
+      contacts: 'Amit',
+      mode: 'simulation now',
+      nextStep: 'Need bot token, webhook URL, signed link/nonce flow.',
+      template: 'telegram_ack_callback_v1',
+    ),
+    _LocalChannel(
+      name: 'Voice call',
+      provider: 'Twilio / Exotel / Plivo decision',
+      readiness: 'script approved',
+      enabled: true,
+      verified: true,
+      contacts: 'Meera, Amit, Dr. Neha, private ambulance',
+      mode: 'test-call only',
+      nextStep: 'Choose provider and add caller ID, callback URLs, DTMF.',
+      template: 'critical_caretaker_call_v1',
+    ),
+    _LocalChannel(
+      name: 'SMS fallback',
+      provider: 'Region-approved SMS gateway',
+      readiness: 'policy draft',
+      enabled: false,
+      verified: false,
+      contacts: 'Caretakers only',
+      mode: 'disabled',
+      nextStep: 'Confirm lawful SMS use and fallback copy.',
+      template: 'urgent_vitals_sms_fallback_v1',
+    ),
   ];
   final List<_LocalAlert> alerts = [
     _LocalAlert(
-      title: 'High heart rate needs review',
-      body: 'Manual heart_rate reading is 132 bpm.',
-      severity: 'high',
+      title: 'Critical vitals escalation active',
+      body:
+          'Heart rate 132 bpm and SpO2 91% were detected in the last '
+          '5 minutes. Caretaker escalation is running in simulation mode.',
+      severity: 'critical',
+      evidence: 'Watch BLE simulator + pulse oximeter',
+      nextAction: 'Send WhatsApp and Telegram alert, then place test call.',
+    ),
+    _LocalAlert(
+      title: 'Evening BP medicine due soon',
+      body:
+          'Telmisartan 40 mg is due at 9:00 PM. Missed-dose policy will '
+          'notify Meera after 45 minutes if consent remains active.',
+      severity: 'moderate',
+      evidence: 'Reviewed prescription schedule',
+      nextAction: 'Wait for patient confirmation or trigger reminder.',
+    ),
+  ];
+  final List<_LocalEscalationAction> escalationActions = [
+    _LocalEscalationAction(
+      step: '1',
+      channel: 'Push',
+      target: 'Ravi Sharma',
+      status: 'delivered',
+      detail: 'Patient confirmation prompt delivered to app.',
+      eta: 'now',
+    ),
+    _LocalEscalationAction(
+      step: '2',
+      channel: 'WhatsApp',
+      target: 'Meera Sharma',
+      status: 'ready',
+      detail:
+          'critical_escalation_caretaker_v1 with AI disclosure and ack link.',
+      eta: '+1 min',
+    ),
+    _LocalEscalationAction(
+      step: '3',
+      channel: 'Telegram',
+      target: 'Amit Sharma',
+      status: 'ready',
+      detail: 'Inline acknowledge buttons after verified bot link.',
+      eta: '+2 min',
+    ),
+    _LocalEscalationAction(
+      step: '4',
+      channel: 'Voice',
+      target: 'Meera Sharma',
+      status: 'test-call planned',
+      detail: 'critical_caretaker_call_v1 with DTMF 1 to acknowledge.',
+      eta: '+4 min',
+    ),
+    _LocalEscalationAction(
+      step: '5',
+      channel: 'Voice',
+      target: 'Dr. Neha Verma',
+      status: 'fallback',
+      detail: 'Minimum necessary PHI summary if caretaker does not respond.',
+      eta: '+8 min',
+    ),
+    _LocalEscalationAction(
+      step: '6',
+      channel: 'Voice',
+      target: 'CarePlus Ambulance Desk',
+      status: 'MVP gated',
+      detail: 'Private ambulance contact only after explicit policy approval.',
+      eta: 'disabled',
     ),
   ];
 
@@ -2073,6 +2355,7 @@ class _LocalCareState extends ChangeNotifier {
       alerts.where((alert) => alert.status == 'open').length;
 
   bool get sosRunning =>
+      escalationActions.any((action) => action.status.contains('sent')) ||
       sosTimeline.any((event) => event.title == 'Simulation started');
 
   void saveProfile({
@@ -2089,6 +2372,8 @@ class _LocalCareState extends ChangeNotifier {
     careGoal = goal.trim().isEmpty ? careGoal : goal.trim();
     caretakerName = caretaker.trim().isEmpty ? caretakerName : caretaker.trim();
     caretakerPhone = phone.trim().isEmpty ? caretakerPhone : phone.trim();
+    contacts[0].name = caretakerName;
+    contacts[0].phone = caretakerPhone;
     notifyListeners();
   }
 
@@ -2104,6 +2389,8 @@ class _LocalCareState extends ChangeNotifier {
       unit: unit.trim().isEmpty ? 'unit' : unit.trim(),
       source: 'manual',
       observedAt: DateTime.now(),
+      freshness: 'fresh',
+      status: 'needs review',
     );
     vitals.insert(0, vital);
     final alert = _alertForVital(vital);
@@ -2116,8 +2403,10 @@ class _LocalCareState extends ChangeNotifier {
       0,
       _LocalMedicine(
         name: name.trim().isEmpty ? 'Medicine' : name.trim(),
+        dose: 'manual entry',
         schedule: schedule.trim().isEmpty ? 'Today' : schedule.trim(),
         status: 'due',
+        source: 'Manual add',
       ),
     );
     notifyListeners();
@@ -2135,6 +2424,8 @@ class _LocalCareState extends ChangeNotifier {
         name: name.trim().isEmpty ? 'care-record.pdf' : name.trim(),
         kind: kind.trim().isEmpty ? 'Medical record' : kind.trim(),
         status: 'needs review',
+        source: 'Manual add',
+        extractedFacts: const ['Awaiting OCR and human review'],
       ),
     );
     notifyListeners();
@@ -2154,46 +2445,74 @@ class _LocalCareState extends ChangeNotifier {
   }
 
   void startSosSimulation() {
+    for (final action in escalationActions) {
+      action.status = switch (action.step) {
+        '1' => 'delivered',
+        '2' => 'sent',
+        '3' => 'sent',
+        '4' => 'ringing test call',
+        '5' => 'queued fallback',
+        _ => action.status,
+      };
+    }
     sosTimeline
       ..clear()
       ..add(
         _LocalTimelineEvent(
           title: 'Simulation started',
-          body: 'No real emergency service or provider was contacted.',
+          body:
+              'Critical vitals scenario started. No real emergency service '
+              'or provider was contacted.',
         ),
       )
       ..add(
         _LocalTimelineEvent(
-          title: 'Patient prompt',
-          body: 'CareAgent would ask for confirmation before escalation.',
+          title: 'WhatsApp and Telegram sent',
+          body:
+              'Meera receives WhatsApp template with ack link. Amit receives '
+              'Telegram bot callback. Both messages are simulation records.',
         ),
       )
       ..add(
         _LocalTimelineEvent(
-          title: 'Caretaker draft ready',
-          body: 'A reviewed, AI-disclosed message is ready for approval.',
+          title: 'Voice test call ringing',
+          body:
+              'critical_caretaker_call_v1 discloses AI identity and asks '
+              'the caretaker to press 1 to acknowledge.',
         ),
       );
     alerts.insert(
       0,
       _LocalAlert(
-        title: 'SOS simulation awaiting acknowledgement',
-        body: 'This is a test run only.',
-        severity: 'moderate',
+        title: 'Multi-channel escalation awaiting acknowledgement',
+        body:
+            'WhatsApp, Telegram, and voice test-call actions are in the '
+            'incident timeline. This is a test run only.',
+        severity: 'critical',
+        evidence: 'Simulation run CRIT-HR-001',
+        nextAction: 'Wait for caretaker ack or continue to doctor fallback.',
       ),
     );
     notifyListeners();
   }
 
   void acknowledgeSos() {
+    for (final action in escalationActions) {
+      if (action.target == caretakerName || action.target == 'Meera Sharma') {
+        action.status = 'acknowledged';
+      }
+    }
     sosTimeline.add(
       _LocalTimelineEvent(
         title: 'Acknowledged',
-        body: '$caretakerName acknowledged the simulated escalation.',
+        body:
+            '$caretakerName acknowledged the simulated escalation from the '
+            'WhatsApp link and voice DTMF path.',
       ),
     );
     for (final alert in alerts) {
-      if (alert.title.contains('SOS simulation')) {
+      if (alert.title.contains('escalation') ||
+          alert.title.contains('Critical vitals')) {
         alert.status = 'acknowledged';
       }
     }
@@ -2219,6 +2538,8 @@ class _LocalCareState extends ChangeNotifier {
         title: 'Heart rate needs review',
         body: 'Manual heart_rate reading is ${vital.value} ${vital.unit}.',
         severity: 'high',
+        evidence: vital.source,
+        nextAction: 'Route to caretaker if still high after recheck.',
       );
     }
     if (vital.metric == 'spo2' && number <= 92) {
@@ -2226,6 +2547,8 @@ class _LocalCareState extends ChangeNotifier {
         title: 'Low oxygen needs review',
         body: 'Manual SpO2 reading is ${vital.value}${vital.unit}.',
         severity: number <= 88 ? 'critical' : 'high',
+        evidence: vital.source,
+        nextAction: 'Prompt urgent recheck and caretaker escalation.',
       );
     }
     return null;
@@ -2234,19 +2557,32 @@ class _LocalCareState extends ChangeNotifier {
   String _replyFor(String text) {
     final lowered = text.toLowerCase();
     if (lowered.contains('medicine')) {
-      return 'I found ${medicines.length} medicine item(s). Review schedules '
-          'before enabling reminders.';
+      final due = medicines.where(
+        (medicine) => medicine.status.contains('due'),
+      );
+      return 'I found ${medicines.length} medicines. ${due.length} item(s) '
+          'need attention. Reminders can notify Meera only because caretaker '
+          'access and WhatsApp consent are active.';
     }
     if (lowered.contains('vital') || lowered.contains('heart')) {
       final latest = vitals.isEmpty ? null : vitals.first;
       return latest == null
           ? 'No vitals are recorded yet.'
           : 'Latest ${latest.metric} is ${latest.value} ${latest.unit} from '
-                '${latest.source}. Contact a clinician for severe symptoms.';
+                '${latest.source}. Status: ${latest.status}. I can escalate '
+                'to verified contacts in simulation mode; contact emergency '
+                'services directly for severe symptoms.';
     }
     if (lowered.contains('sos') || lowered.contains('emergency')) {
-      return 'For a real emergency, contact local emergency services now. '
-          'The CareAgent SOS flow here is simulation-only.';
+      return 'For a real emergency, call local emergency services now. MVP '
+          'automation will first notify Meera by WhatsApp, Amit by Telegram, '
+          'then place an AI-disclosed test call. Public emergency calling is '
+          'disabled until explicit policy and provider approval.';
+    }
+    if (lowered.contains('whatsapp') || lowered.contains('telegram')) {
+      return 'WhatsApp uses approved Cloud API or BSP templates. Telegram '
+          'uses a verified Bot API link with callback buttons. Both require '
+          'webhook signature checks, consent, rate limits, and audit logs.';
     }
     return 'I can help organize your setup. Current profile: $patientName, '
         '$activeConsentCount active consent(s), and $openAlertCount open alert(s).';
@@ -2260,6 +2596,8 @@ class _LocalVital {
     required this.unit,
     required this.source,
     required this.observedAt,
+    required this.freshness,
+    required this.status,
   });
 
   final String metric;
@@ -2267,17 +2605,23 @@ class _LocalVital {
   final String unit;
   final String source;
   final DateTime observedAt;
+  final String freshness;
+  final String status;
 }
 
 class _LocalMedicine {
   _LocalMedicine({
     required this.name,
+    required this.dose,
     required this.schedule,
     required this.status,
+    required this.source,
   });
 
   final String name;
+  final String dose;
   final String schedule;
+  final String source;
   String status;
 }
 
@@ -2286,10 +2630,14 @@ class _LocalDocument {
     required this.name,
     required this.kind,
     required this.status,
+    required this.source,
+    required this.extractedFacts,
   });
 
   final String name;
   final String kind;
+  final String source;
+  final List<String> extractedFacts;
   String status;
 }
 
@@ -2310,13 +2658,67 @@ class _LocalTimelineEvent {
 class _LocalChannel {
   _LocalChannel({
     required this.name,
+    required this.provider,
+    required this.readiness,
     required this.enabled,
     required this.verified,
+    required this.contacts,
+    required this.mode,
+    required this.nextStep,
+    required this.template,
   });
 
   final String name;
+  final String provider;
+  final String readiness;
+  final String contacts;
+  final String mode;
+  final String nextStep;
+  final String template;
   bool enabled;
   bool verified;
+}
+
+class _LocalContact {
+  _LocalContact({
+    required this.name,
+    required this.role,
+    required this.relation,
+    required this.phone,
+    required this.priority,
+    required this.channels,
+    required this.verification,
+    required this.consent,
+    required this.lastAction,
+  });
+
+  String name;
+  final String role;
+  final String relation;
+  String phone;
+  final int priority;
+  final List<String> channels;
+  final String verification;
+  final String consent;
+  final String lastAction;
+}
+
+class _LocalEscalationAction {
+  _LocalEscalationAction({
+    required this.step,
+    required this.channel,
+    required this.target,
+    required this.status,
+    required this.detail,
+    required this.eta,
+  });
+
+  final String step;
+  final String channel;
+  final String target;
+  String status;
+  final String detail;
+  final String eta;
 }
 
 class _LocalAlert {
@@ -2324,11 +2726,15 @@ class _LocalAlert {
     required this.title,
     required this.body,
     required this.severity,
+    required this.evidence,
+    required this.nextAction,
   });
 
   final String title;
   final String body;
   final String severity;
+  final String evidence;
+  final String nextAction;
   String status = 'open';
 }
 
@@ -2444,6 +2850,14 @@ class _LocalCareSnapshot extends StatelessWidget {
               icon: Icons.notification_important_outlined,
               label: '${careState.openAlertCount} open alert(s)',
             ),
+            _StatusChip(
+              icon: Icons.group_outlined,
+              label: '${careState.contacts.length} contacts',
+            ),
+            _StatusChip(
+              icon: Icons.settings_phone_outlined,
+              label: 'WhatsApp + Telegram + calls',
+            ),
           ],
         );
       },
@@ -2463,6 +2877,76 @@ class _StatusChip extends StatelessWidget {
       avatar: Icon(icon, size: 18),
       label: Text(label),
       visualDensity: VisualDensity.compact,
+    );
+  }
+}
+
+class _HackathonDemoPanel extends StatelessWidget {
+  const _HackathonDemoPanel({required this.careState});
+
+  final _LocalCareState careState;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.play_circle_outline, color: theme.colorScheme.error),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Hackathon demo scenario',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Show Ravi Sharma, a 68-year-old patient with recent critical '
+              'vitals. CareAgent explains the evidence, displays reviewed '
+              'medicine/document data, sends simulated WhatsApp and Telegram '
+              'alerts to verified contacts, and prepares an AI-disclosed '
+              'test voice call without contacting real emergency services.',
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _StatusChip(
+                  icon: Icons.monitor_heart_outlined,
+                  label:
+                      '${careState.vitals.first.value} '
+                      '${careState.vitals.first.unit} HR',
+                ),
+                _StatusChip(
+                  icon: Icons.medication_outlined,
+                  label: '${careState.medicines.length} medicines',
+                ),
+                _StatusChip(
+                  icon: Icons.description_outlined,
+                  label: '${careState.documents.length} documents',
+                ),
+                _StatusChip(
+                  icon: Icons.timeline_outlined,
+                  label: '${careState.escalationActions.length} step runbook',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -2553,10 +3037,18 @@ class _OnboardingFeatureState extends State<_OnboardingFeature> {
           icon: Icons.badge_outlined,
           title: widget.careState.patientName,
           body:
-              '${widget.careState.language}. ${widget.careState.careGoal}\n'
+              '${widget.careState.ageAndLocation}. '
+              '${widget.careState.language}.\n'
+              '${widget.careState.careGoal}\n'
+              'Conditions: ${widget.careState.conditions}. '
+              'Allergies: ${widget.careState.allergies}.\n'
+              'Emergency address: ${widget.careState.emergencyAddress}\n'
               'Primary caretaker: ${widget.careState.caretakerName}, '
               '${widget.careState.caretakerPhone}',
         ),
+        const SizedBox(height: 8),
+        for (final contact in widget.careState.contacts.take(2))
+          _ContactCard(contact: contact),
       ],
     );
   }
@@ -2570,6 +3062,7 @@ class _ConsentFeature extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         for (final entry in careState.consents.entries)
           SwitchListTile(
@@ -2587,6 +3080,15 @@ class _ConsentFeature extends StatelessWidget {
                   : 'Disabled. Related actions stay blocked or simulation-only.',
             ),
           ),
+        const SizedBox(height: 8),
+        const _InfoTile(
+          icon: Icons.rule_outlined,
+          title: 'MVP gate',
+          body:
+              'Real WhatsApp, Telegram, and voice dispatch will require '
+              'verified contacts, provider webhooks, idempotency keys, '
+              'rate limits, and audit records before production use.',
+        ),
       ],
     );
   }
@@ -2650,7 +3152,8 @@ class _VitalsFeatureState extends State<_VitalsFeature> {
             icon: Icons.favorite_outline,
             title: '${vital.metric}: ${vital.value} ${vital.unit}',
             body:
-                'Source: ${vital.source}. Freshness: fresh. Observed at '
+                'Status: ${vital.status}. Source: ${vital.source}. '
+                'Freshness: ${vital.freshness}. Observed at '
                 '${TimeOfDay.fromDateTime(vital.observedAt).format(context)}.',
           ),
       ],
@@ -2709,7 +3212,10 @@ class _MedicinesFeatureState extends State<_MedicinesFeature> {
             child: ListTile(
               leading: const Icon(Icons.medication_outlined),
               title: Text(medicine.name),
-              subtitle: Text('${medicine.schedule} - ${medicine.status}'),
+              subtitle: Text(
+                '${medicine.dose} - ${medicine.schedule}\n'
+                '${medicine.status} - ${medicine.source}',
+              ),
               trailing: medicine.status == 'taken'
                   ? const Icon(Icons.check_circle_outline)
                   : TextButton(
@@ -2774,7 +3280,11 @@ class _DocumentsFeatureState extends State<_DocumentsFeature> {
             child: ListTile(
               leading: const Icon(Icons.description_outlined),
               title: Text(document.name),
-              subtitle: Text('${document.kind} - ${document.status}'),
+              subtitle: Text(
+                '${document.kind} - ${document.status}\n'
+                'Source: ${document.source}\n'
+                'Facts: ${document.extractedFacts.join('; ')}',
+              ),
               trailing: document.status == 'reviewed'
                   ? const Icon(Icons.fact_check_outlined)
                   : TextButton(
@@ -2841,6 +3351,23 @@ class _ChatFeatureState extends State<_ChatFeature> {
           icon: const Icon(Icons.send_outlined),
           label: const Text('Send'),
         ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final prompt in const [
+              'Explain the alert evidence',
+              'What happens on WhatsApp?',
+              'What medicine is due?',
+              'Start emergency simulation?',
+            ])
+              ActionChip(
+                label: Text(prompt),
+                onPressed: () => widget.careState.sendMessage(prompt),
+              ),
+          ],
+        ),
       ],
     );
   }
@@ -2879,6 +3406,9 @@ class _SosFeature extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
+        for (final action in careState.escalationActions)
+          _EscalationActionTile(action: action),
+        const SizedBox(height: 8),
         for (final event in careState.sosTimeline)
           _InfoTile(
             icon: Icons.timeline_outlined,
@@ -2899,12 +3429,11 @@ class _CaretakerFeature extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _InfoTile(
-      icon: Icons.contact_phone_outlined,
-      title: careState.caretakerName,
-      body:
-          '${careState.caretakerPhone}\nRole: primary caretaker\n'
-          'Can acknowledge alerts after consent is active.',
+    return Column(
+      children: [
+        for (final contact in careState.contacts)
+          _ContactCard(contact: contact),
+      ],
     );
   }
 }
@@ -2919,20 +3448,9 @@ class _ChannelsFeature extends StatelessWidget {
     return Column(
       children: [
         for (final channel in careState.channels)
-          SwitchListTile(
-            value: channel.enabled,
+          _ChannelCard(
+            channel: channel,
             onChanged: (value) => careState.setChannelEnabled(channel, value),
-            secondary: Icon(
-              channel.verified
-                  ? Icons.mark_email_read_outlined
-                  : Icons.mark_email_unread_outlined,
-            ),
-            title: Text(channel.name),
-            subtitle: Text(
-              channel.verified
-                  ? 'Verified for simulation workflow.'
-                  : 'Not verified. Toggle to simulate verification.',
-            ),
           ),
       ],
     );
@@ -2957,7 +3475,8 @@ class _AlertsFeature extends StatelessWidget {
               leading: const Icon(Icons.notification_important_outlined),
               title: Text(alert.title),
               subtitle: Text(
-                '${alert.severity} - ${alert.status}\n${alert.body}',
+                '${alert.severity} - ${alert.status}\n${alert.body}\n'
+                'Evidence: ${alert.evidence}\nNext: ${alert.nextAction}',
               ),
               trailing: alert.status == 'open'
                   ? TextButton(
@@ -2968,6 +3487,91 @@ class _AlertsFeature extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _ContactCard extends StatelessWidget {
+  const _ContactCard({required this.contact});
+
+  final _LocalContact contact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: CircleAvatar(child: Text(contact.priority.toString())),
+        title: Text(contact.name),
+        subtitle: Text(
+          '${contact.role} - ${contact.relation}\n'
+          '${contact.phone}\n'
+          'Channels: ${contact.channels.join(', ')}\n'
+          'Verification: ${contact.verification}; consent: ${contact.consent}\n'
+          '${contact.lastAction}',
+        ),
+        trailing: const Icon(Icons.verified_outlined),
+      ),
+    );
+  }
+}
+
+class _ChannelCard extends StatelessWidget {
+  const _ChannelCard({required this.channel, required this.onChanged});
+
+  final _LocalChannel channel;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: channel.enabled,
+              onChanged: onChanged,
+              secondary: Icon(
+                channel.verified
+                    ? Icons.mark_email_read_outlined
+                    : Icons.mark_email_unread_outlined,
+                color: theme.colorScheme.primary,
+              ),
+              title: Text(channel.name),
+              subtitle: Text('${channel.provider} - ${channel.readiness}'),
+            ),
+            Text(
+              'Mode: ${channel.mode}\n'
+              'Contacts: ${channel.contacts}\n'
+              'Template/script: ${channel.template}\n'
+              'Next setup: ${channel.nextStep}',
+              style: theme.textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EscalationActionTile extends StatelessWidget {
+  const _EscalationActionTile({required this.action});
+
+  final _LocalEscalationAction action;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: CircleAvatar(child: Text(action.step)),
+        title: Text('${action.channel} to ${action.target}'),
+        subtitle: Text('${action.status} - ${action.eta}\n${action.detail}'),
+        trailing: const Icon(Icons.route_outlined),
+      ),
     );
   }
 }
@@ -3212,11 +3816,14 @@ const _sosIndex = 7;
 const _sections = <_Section>[
   _Section(
     title: 'Home',
-    heading: 'CareAgent MVP Shell',
-    shortLabel: 'Safety-first starting point',
-    description: 'A guided patient app foundation for the controlled MVP.',
-    noticeTitle: 'No monitoring active',
-    notice: 'This scaffold does not collect or interpret health data.',
+    heading: 'CareAgent Hackathon Demo',
+    shortLabel: 'Synthetic end-to-end care flow',
+    description:
+        'A guided MVP demo for patient setup, records, alerts, and escalation.',
+    noticeTitle: 'Synthetic demo data',
+    notice:
+        'The visible patient, vitals, documents, channel messages, and calls '
+        'are seeded demo records unless a backend action is explicitly run.',
     icon: Icons.home_outlined,
     selectedIcon: Icons.home,
     items: [],
@@ -3226,10 +3833,10 @@ const _sections = <_Section>[
     heading: 'Onboarding',
     shortLabel: 'Profile, care team, and permissions',
     description: 'Guided profile setup for first-run care coordination.',
-    noticeTitle: 'Setup needs a saved profile',
+    noticeTitle: 'Demo profile can be edited',
     notice:
-        'No account, contacts, permissions, or health data are saved by '
-        'this shell.',
+        'The seeded profile is synthetic. Production onboarding must verify '
+        'identity, contacts, consent, address, and emergency policy.',
     icon: Icons.person_add_alt_1_outlined,
     selectedIcon: Icons.person_add_alt_1,
     items: [
@@ -3261,7 +3868,7 @@ const _sections = <_Section>[
     heading: 'Consent Center',
     shortLabel: 'Separate grants and revocation',
     description: 'Purpose-specific consent controls and revocation states.',
-    noticeTitle: 'No consent has been granted',
+    noticeTitle: 'Consent is separated by purpose',
     notice:
         'Health data, documents, caretaker access, channels, calls, and '
         'location sharing must be granted separately before use.',
@@ -3433,7 +4040,8 @@ const _sections = <_Section>[
     title: 'SOS',
     heading: 'SOS',
     shortLabel: 'Emergency readiness',
-    description: 'Manual SOS readiness and simulation-only escalation status.',
+    description:
+        'Manual SOS readiness, multi-contact escalation, and test calls.',
     noticeTitle: 'This screen does not call emergency services',
     notice:
         'In a real emergency, call your local emergency number now. '
