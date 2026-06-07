@@ -22,6 +22,9 @@ class CareAgentApiClient {
   /// Supplies Firebase ID tokens.
   final IdTokenProvider idTokenProvider;
 
+  /// Role selected at sign-in and sent to backend auth/session boundaries.
+  String careAgentRole = 'patient';
+
   final http.Client _httpClient;
 
   /// Whether API calls are enabled.
@@ -293,6 +296,7 @@ class CareAgentApiClient {
     final requestHeaders = {
       'Authorization': 'Bearer $token',
       'Content-Type': 'application/json',
+      'X-CareAgent-Role': careAgentRole,
       ...?headers,
     };
 

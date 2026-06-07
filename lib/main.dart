@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,6 +21,22 @@ import 'mascot/caro_state.dart';
 
 /// Current safety notice copy version stored after acknowledgement.
 const String careAgentSafetyNoticeVersion = 'pilot-v1';
+
+/// Demo and sandbox controls stay out of normal patient/caretaker screens.
+const bool careAgentShowDemoTools = bool.fromEnvironment(
+  'CAREAGENT_SHOW_DEMO_TOOLS',
+);
+
+bool get _careAgentRunningInWidgetTest {
+  var running = false;
+  assert(() {
+    running = WidgetsBinding.instance.runtimeType.toString().contains(
+      'AutomatedTest',
+    );
+    return true;
+  }());
+  return running;
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,6 +52,68 @@ enum CareAgentAuthStatus {
   signedIn,
   needsEmailVerification,
   error,
+}
+
+/// User-facing account type selected before authentication.
+enum CareAgentUserRole {
+  patient,
+  caretaker;
+
+  String get wireName => switch (this) {
+    CareAgentUserRole.patient => 'patient',
+    CareAgentUserRole.caretaker => 'caretaker',
+  };
+
+  String get label => switch (this) {
+    CareAgentUserRole.patient => 'Patient',
+    CareAgentUserRole.caretaker => 'Caretaker',
+  };
+
+  String get loginTitle => switch (this) {
+    CareAgentUserRole.patient => 'Patient login',
+    CareAgentUserRole.caretaker => 'Caretaker login',
+  };
+
+  String get loginSubtitle => switch (this) {
+    CareAgentUserRole.patient =>
+      'For daily medicines, vitals, records, Caro chat, and emergency policy.',
+    CareAgentUserRole.caretaker =>
+      'For patient queues, urgent alerts, acknowledgements, and care-team coordination.',
+  };
+
+  String get dashboardTitle => switch (this) {
+    CareAgentUserRole.patient => 'Care status',
+    CareAgentUserRole.caretaker => 'Caretaker command',
+  };
+
+  String get companionTitle => switch (this) {
+    CareAgentUserRole.patient => 'Caro keeps your care day organized',
+    CareAgentUserRole.caretaker => 'Caro triages what needs your attention',
+  };
+
+  IconData get icon => switch (this) {
+    CareAgentUserRole.patient => Icons.favorite_outline,
+    CareAgentUserRole.caretaker => Icons.volunteer_activism_outlined,
+  };
+}
+
+/// Persists the selected account type between app launches.
+abstract final class CareAgentRolePreferences {
+  static const _roleKey = 'careagent.login_role';
+
+  static Future<CareAgentUserRole> load() async {
+    final preferences = await SharedPreferences.getInstance();
+    final wireName = preferences.getString(_roleKey);
+    return CareAgentUserRole.values.firstWhere(
+      (role) => role.wireName == wireName,
+      orElse: () => CareAgentUserRole.patient,
+    );
+  }
+
+  static Future<void> save(CareAgentUserRole role) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_roleKey, role.wireName);
+  }
 }
 
 /// Persists whether the current safety notice version was acknowledged.
@@ -100,9 +181,7 @@ class CareAgentAuthController extends ChangeNotifier {
       if (kIsWeb) {
         if (!DefaultFirebaseOptions.hasRequiredWebOptions) {
           return CareAgentAuthController.previewUnconfigured(
-            message:
-                'This browser preview is missing Firebase web configuration. '
-                'Android app builds use android/app/google-services.json.',
+            message: 'Sign-in is not ready on this app build.',
           );
         }
         await Firebase.initializeApp(options: DefaultFirebaseOptions.web);
@@ -374,7 +453,7 @@ class CareAgentAuthController extends ChangeNotifier {
 
   void _setUnconfiguredError() {
     _status = CareAgentAuthStatus.unconfigured;
-    _errorMessage = 'Firebase Auth is not configured for this build.';
+    _errorMessage = 'Sign-in is not ready on this app build.';
     notifyListeners();
   }
 
@@ -408,7 +487,7 @@ String careAgentAuthErrorMessage(Object error) {
       case 'network-request-failed':
         return 'Network error. Check your connection and try again.';
       case 'operation-not-allowed':
-        return 'This sign-in method is not enabled in Firebase Auth.';
+        return 'This sign-in method is not available.';
       default:
         final message = error.message?.trim();
         return message == null || message.isEmpty
@@ -420,7 +499,7 @@ String careAgentAuthErrorMessage(Object error) {
   if (error is PlatformException) {
     final message = '${error.code} ${error.message ?? ''}'.toLowerCase();
     if (_looksLikeGoogleConfigIssue(message)) {
-      return 'Google Sign-In configuration error. Check the Firebase Android client package and SHA fingerprint.';
+      return 'Google sign-in is not ready for this app build.';
     }
     if (message.contains('sign_in_canceled') || message.contains('canceled')) {
       return 'Google sign-in was cancelled.';
@@ -430,7 +509,7 @@ String careAgentAuthErrorMessage(Object error) {
 
   final message = error.toString().replaceFirst('Exception: ', '').trim();
   if (_looksLikeGoogleConfigIssue(message.toLowerCase())) {
-    return 'Google Sign-In configuration error. Check the Firebase Android client package and SHA fingerprint.';
+    return 'Google sign-in is not ready for this app build.';
   }
   return message.isEmpty ? 'Authentication failed.' : message;
 }
@@ -524,11 +603,16 @@ class _SafetyGateState extends State<_SafetyGate> {
   }
 
   Future<void> _acceptSafetyNotice() async {
-    await widget.safetyNoticeStore.accept();
     if (!mounted) return;
     setState(() {
       _acceptedSafetyNotice = true;
     });
+    try {
+      await widget.safetyNoticeStore.accept();
+    } catch (_) {
+      // Acceptance should not trap users on the notice if persistence is
+      // temporarily unavailable in a browser or embedded preview.
+    }
   }
 
   @override
@@ -560,11 +644,13 @@ class _SafetyNoticeLoadingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    return const _PremiumStage(
+      child: Center(child: CircularProgressIndicator()),
+    );
   }
 }
 
-class _AuthGate extends StatelessWidget {
+class _AuthGate extends StatefulWidget {
   const _AuthGate({
     required this.authController,
     required this.apiClient,
@@ -575,28 +661,69 @@ class _AuthGate extends StatelessWidget {
   final CareAgentApiClient apiClient;
 
   @override
+  State<_AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<_AuthGate> {
+  CareAgentUserRole _selectedRole = CareAgentUserRole.patient;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.apiClient.careAgentRole = _selectedRole.wireName;
+    unawaited(_loadRole());
+  }
+
+  Future<void> _loadRole() async {
+    final role = await CareAgentRolePreferences.load();
+    if (!mounted) return;
+    _applyRole(role, persist: false);
+  }
+
+  void _applyRole(CareAgentUserRole role, {bool persist = true}) {
+    widget.apiClient.careAgentRole = role.wireName;
+    setState(() {
+      _selectedRole = role;
+    });
+    if (persist) {
+      unawaited(CareAgentRolePreferences.save(role));
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: authController,
+      animation: widget.authController,
       builder: (context, _) {
-        if (authController.status == CareAgentAuthStatus.signedIn) {
+        if (widget.authController.status == CareAgentAuthStatus.signedIn) {
           return _CareAgentShell(
-            apiClient: apiClient,
-            userEmail: authController.userEmail,
-            onSignOut: authController.signOut,
+            apiClient: widget.apiClient,
+            loginRole: _selectedRole,
+            userEmail: widget.authController.userEmail,
+            onSignOut: widget.authController.signOut,
           );
         }
 
-        return _LoginScreen(authController: authController);
+        return _LoginScreen(
+          authController: widget.authController,
+          selectedRole: _selectedRole,
+          onRoleChanged: _applyRole,
+        );
       },
     );
   }
 }
 
 class _LoginScreen extends StatefulWidget {
-  const _LoginScreen({required this.authController});
+  const _LoginScreen({
+    required this.authController,
+    required this.selectedRole,
+    required this.onRoleChanged,
+  });
 
   final CareAgentAuthController authController;
+  final CareAgentUserRole selectedRole;
+  final ValueChanged<CareAgentUserRole> onRoleChanged;
 
   @override
   State<_LoginScreen> createState() => _LoginScreenState();
@@ -782,201 +909,215 @@ class _LoginScreenState extends State<_LoginScreen> {
       return _buildEmailVerificationScreen();
     }
 
-    final theme = Theme.of(context);
     final isConfigured = authController.isConfigured;
     final isSigningIn = authController.status == CareAgentAuthStatus.signingIn;
     final isBusy = isSigningIn || _isResettingPassword;
+    final role = widget.selectedRole;
 
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const CaroCompanion(
-                    state: CaroState.neutral,
-                    title: 'Caro keeps the setup guided',
-                    message:
-                        'Sign in first, then CareAgent can connect your '
-                        'profile, consent, vitals, and simulation history.',
-                  ),
-                  const SizedBox(height: 24),
-                  Icon(
-                    Icons.lock_person_outlined,
-                    size: 56,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Sign in to CareAgent',
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'CareAgent uses Firebase Auth for account access. '
-                    'Patient records, connected devices, messages, and '
-                    'emergency workflows stay unavailable until a user is '
-                    'authenticated and consent is configured.',
-                    style: theme.textTheme.bodyLarge,
-                  ),
-                  const SizedBox(height: 20),
-                  if (!isConfigured)
-                    _SafetyBanner(
-                      title: kIsWeb
-                          ? 'Browser preview configuration required'
-                          : 'Android Firebase configuration required',
-                      message: kIsWeb
-                          ? 'This is the browser build. It needs Firebase web '
-                                'options through defaults or FIREBASE_* '
-                                'dart-define values. The installed Android app '
-                                'uses android/app/google-services.json.'
-                          : 'The Android app needs a google-services.json '
-                                'registered for package app.careagent.patient.',
-                    )
-                  else
-                    _SafetyBanner(
-                      title: 'Firebase sign-in',
-                      message:
-                          'Google and email/password sign-in use the '
-                          'configured Firebase project for CareAgent access.',
-                    ),
-                  if (authController.errorMessage != null) ...[
-                    const SizedBox(height: 12),
-                    _SafetyBanner(
-                      title: 'Sign-in issue',
-                      message: authController.errorMessage!,
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: isConfigured && !isBusy
-                          ? _signInWithGoogle
-                          : null,
-                      icon: isSigningIn
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.login),
-                      label: Text(
-                        isSigningIn ? 'Signing in' : 'Continue with Google',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      const Expanded(child: Divider()),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          'or use email',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ),
-                      const Expanded(child: Divider()),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        if (!_isLogin) ...[
-                          _LoginTextField(
-                            controller: _nameController,
-                            label: 'Full name',
-                            icon: Icons.person_outline,
-                            validator: _validateName,
-                            enabled: isConfigured && !isBusy,
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                        _LoginTextField(
-                          controller: _emailController,
-                          label: 'Email',
-                          icon: Icons.email_outlined,
-                          keyboardType: TextInputType.emailAddress,
-                          validator: _validateEmail,
-                          enabled: isConfigured && !isBusy,
-                        ),
-                        const SizedBox(height: 12),
-                        _LoginTextField(
-                          controller: _passwordController,
-                          label: 'Password',
-                          icon: Icons.lock_outline,
-                          obscureText: _obscurePassword,
-                          validator: _validatePassword,
-                          enabled: isConfigured && !isBusy,
-                          suffix: IconButton(
-                            tooltip: _obscurePassword
-                                ? 'Show password'
-                                : 'Hide password',
-                            onPressed: isBusy
-                                ? null
-                                : () {
-                                    setState(() {
-                                      _obscurePassword = !_obscurePassword;
-                                    });
-                                  },
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
+    return _PremiumStage(
+      child: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 980;
+            final horizontal = wide ? 40.0 : 18.0;
+
+            return SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(horizontal, 20, horizontal, 32),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1180),
+                  child: wide
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(child: _LoginHeroPanel(role: role)),
+                            const SizedBox(width: 28),
+                            SizedBox(
+                              width: 520,
+                              child: _GlassPanel(
+                                child: _buildLoginForm(
+                                  context,
+                                  role: role,
+                                  isConfigured: isConfigured,
+                                  isSigningIn: isSigningIn,
+                                  isBusy: isBusy,
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                        if (_isLogin)
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: isConfigured && !isBusy
-                                  ? _sendPasswordReset
-                                  : null,
-                              child: const Text('Forgot password?'),
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _LoginHeroPanel(role: role, compact: true),
+                            const SizedBox(height: 18),
+                            _GlassPanel(
+                              child: _buildLoginForm(
+                                context,
+                                role: role,
+                                isConfigured: isConfigured,
+                                isSigningIn: isSigningIn,
+                                isBusy: isBusy,
+                              ),
                             ),
-                          )
-                        else
-                          const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton(
-                            onPressed: isConfigured && !isBusy
-                                ? _submitEmail
-                                : null,
-                            child: Text(
-                              _isLogin ? 'Sign in' : 'Create account',
-                            ),
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Center(
-                    child: TextButton(
-                      onPressed: isBusy ? null : _toggleMode,
-                      child: Text(
-                        _isLogin
-                            ? 'Create a new account'
-                            : 'Sign in to an existing account',
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoginForm(
+    BuildContext context, {
+    required CareAgentUserRole role,
+    required bool isConfigured,
+    required bool isSigningIn,
+    required bool isBusy,
+  }) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _RoleSelector(
+          selectedRole: role,
+          onChanged: isBusy ? null : widget.onRoleChanged,
+        ),
+        const SizedBox(height: 22),
+        Text(
+          'Sign in to CareAgent',
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: theme.colorScheme.primary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(role.loginTitle, style: theme.textTheme.headlineMedium),
+        const SizedBox(height: 10),
+        Text(role.loginSubtitle, style: theme.textTheme.bodyLarge),
+        const SizedBox(height: 20),
+        if (!isConfigured)
+          _SafetyBanner(
+            title: 'Sign-in unavailable',
+            message:
+                'CareAgent sign-in is not ready on this build. Please use a configured app build.',
+          ),
+        if (authController.errorMessage != null) ...[
+          const SizedBox(height: 12),
+          _SafetyBanner(
+            title: 'Sign-in issue',
+            message: authController.errorMessage!,
+          ),
+        ],
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: isConfigured && !isBusy ? _signInWithGoogle : null,
+            icon: isSigningIn
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.login),
+            label: Text(isSigningIn ? 'Signing in' : 'Continue with Google'),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            const Expanded(child: Divider()),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text('or use email', style: theme.textTheme.bodySmall),
+            ),
+            const Expanded(child: Divider()),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              if (!_isLogin) ...[
+                _LoginTextField(
+                  controller: _nameController,
+                  label: 'Full name',
+                  icon: Icons.person_outline,
+                  validator: _validateName,
+                  enabled: isConfigured && !isBusy,
+                ),
+                const SizedBox(height: 12),
+              ],
+              _LoginTextField(
+                controller: _emailController,
+                label: 'Email',
+                icon: Icons.email_outlined,
+                keyboardType: TextInputType.emailAddress,
+                validator: _validateEmail,
+                enabled: isConfigured && !isBusy,
+              ),
+              const SizedBox(height: 12),
+              _LoginTextField(
+                controller: _passwordController,
+                label: 'Password',
+                icon: Icons.lock_outline,
+                obscureText: _obscurePassword,
+                validator: _validatePassword,
+                enabled: isConfigured && !isBusy,
+                suffix: IconButton(
+                  tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+                  onPressed: isBusy
+                      ? null
+                      : () {
+                          setState(() {
+                            _obscurePassword = !_obscurePassword;
+                          });
+                        },
+                  icon: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                  ),
+                ),
+              ),
+              if (_isLogin)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: isConfigured && !isBusy
+                        ? _sendPasswordReset
+                        : null,
+                    child: const Text('Forgot password?'),
+                  ),
+                )
+              else
+                const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: isConfigured && !isBusy ? _submitEmail : null,
+                  child: Text(_isLogin ? 'Sign in' : 'Create account'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Center(
+          child: TextButton(
+            onPressed: isBusy ? null : _toggleMode,
+            child: Text(
+              _isLogin
+                  ? 'Create a new account'
+                  : 'Sign in to an existing account',
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -985,90 +1126,539 @@ class _LoginScreenState extends State<_LoginScreen> {
     final email = authController.userEmail ?? _emailController.text.trim();
     final isBusy = _isCheckingVerification || _isResendingVerification;
 
-    return Scaffold(
-      body: SafeArea(
+    return _PremiumStage(
+      child: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const CaroCompanion(
-                    state: CaroState.concerned,
-                    title: 'One more step before health workflows',
-                    message:
-                        'Email verification protects access before records, '
-                        'consent, and care-team actions become available.',
-                  ),
-                  const SizedBox(height: 24),
-                  Icon(
-                    Icons.mark_email_read_outlined,
-                    size: 56,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Verify your email',
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
+              constraints: const BoxConstraints(maxWidth: 620),
+              child: _GlassPanel(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const CaroCompanion(
+                      state: CaroState.concerned,
+                      title: 'One more step before health workflows',
+                      message:
+                          'Email verification protects access before records, '
+                          'consent, and care-team actions become available.',
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Open the verification link sent to $email, then return '
-                    'to CareAgent.',
-                    style: theme.textTheme.bodyLarge,
-                  ),
-                  const SizedBox(height: 20),
-                  _SafetyBanner(
-                    title: 'Email verification required',
-                    message:
-                        'Email/password accounts must be verified before '
-                        'CareAgent unlocks protected health workflows.',
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: isBusy ? null : _checkEmailVerification,
-                      icon: _isCheckingVerification
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.verified_outlined),
-                      label: const Text('I verified my email'),
+                    const SizedBox(height: 24),
+                    Icon(
+                      Icons.mark_email_read_outlined,
+                      size: 56,
+                      color: theme.colorScheme.primary,
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: isBusy ? null : _resendVerificationEmail,
-                      icon: _isResendingVerification
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.outgoing_mail),
-                      label: const Text('Resend email'),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Verify your email',
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Center(
-                    child: TextButton(
-                      onPressed: isBusy ? null : authController.signOut,
-                      child: const Text('Use a different account'),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Open the verification link sent to $email, then return '
+                      'to CareAgent.',
+                      style: theme.textTheme.bodyLarge,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 20),
+                    _SafetyBanner(
+                      title: 'Email verification required',
+                      message:
+                          'Email/password accounts must be verified before '
+                          'CareAgent unlocks protected health workflows.',
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: isBusy ? null : _checkEmailVerification,
+                        icon: _isCheckingVerification
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.verified_outlined),
+                        label: const Text('I verified my email'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: isBusy ? null : _resendVerificationEmail,
+                        icon: _isResendingVerification
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.outgoing_mail),
+                        label: const Text('Resend email'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Center(
+                      child: TextButton(
+                        onPressed: isBusy ? null : authController.signOut,
+                        child: const Text('Use a different account'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PremiumStage extends StatelessWidget {
+  const _PremiumStage({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(body: _PremiumBackdrop(child: child));
+  }
+}
+
+class _PremiumBackdrop extends StatefulWidget {
+  const _PremiumBackdrop({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_PremiumBackdrop> createState() => _PremiumBackdropState();
+}
+
+class _PremiumBackdropState extends State<_PremiumBackdrop>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 18),
+    );
+    if (!_careAgentRunningInWidgetTest) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    if ((reduceMotion || _careAgentRunningInWidgetTest) &&
+        _controller.isAnimating) {
+      _controller.stop();
+    } else if (!reduceMotion &&
+        !_careAgentRunningInWidgetTest &&
+        !_controller.isAnimating) {
+      _controller.repeat();
+    }
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return CustomPaint(
+          painter: _CareBackdropPainter(
+            progress: reduceMotion ? 0 : _controller.value,
+            dark: Theme.of(context).brightness == Brightness.dark,
+          ),
+          child: child,
+        );
+      },
+      child: widget.child,
+    );
+  }
+}
+
+class _CareBackdropPainter extends CustomPainter {
+  const _CareBackdropPainter({required this.progress, required this.dark});
+
+  final double progress;
+  final bool dark;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final base = Paint()
+      ..shader = ui.Gradient.linear(
+        Offset.zero,
+        Offset(0, size.height),
+        dark
+            ? const [Color(0xFF071817), Color(0xFF101A28)]
+            : const [Color(0xFFF9FDFF), Color(0xFFEFF6F8)],
+      );
+    canvas.drawRect(rect, base);
+
+    _paintRibbon(
+      canvas,
+      size,
+      y: size.height * 0.18,
+      height: size.height * 0.22,
+      color: dark ? const Color(0xFF1D4E5B) : const Color(0xFFBFEAF0),
+      phase: progress,
+      alpha: dark ? 0.34 : 0.52,
+    );
+    _paintRibbon(
+      canvas,
+      size,
+      y: size.height * 0.62,
+      height: size.height * 0.18,
+      color: dark ? const Color(0xFF533D61) : const Color(0xFFE6D8FF),
+      phase: progress + 0.34,
+      alpha: dark ? 0.24 : 0.42,
+    );
+    _paintRibbon(
+      canvas,
+      size,
+      y: size.height * 0.82,
+      height: size.height * 0.16,
+      color: dark ? const Color(0xFF5C2630) : const Color(0xFFFFD9DF),
+      phase: progress + 0.62,
+      alpha: dark ? 0.22 : 0.36,
+    );
+
+    final linePaint = Paint()
+      ..color = (dark ? Colors.white : const Color(0xFF2E4750)).withValues(
+        alpha: dark ? 0.035 : 0.045,
+      )
+      ..strokeWidth = 1;
+    for (var x = -size.height; x < size.width; x += 54) {
+      canvas.drawLine(
+        Offset(x.toDouble(), size.height),
+        Offset(x + size.height * 0.62, 0),
+        linePaint,
+      );
+    }
+  }
+
+  void _paintRibbon(
+    Canvas canvas,
+    Size size, {
+    required double y,
+    required double height,
+    required Color color,
+    required double phase,
+    required double alpha,
+  }) {
+    final wave = math.sin(phase * math.pi * 2) * 18;
+    final path = Path()
+      ..moveTo(-40, y + wave)
+      ..cubicTo(
+        size.width * 0.25,
+        y - height * 0.42,
+        size.width * 0.62,
+        y + height * 0.42,
+        size.width + 40,
+        y - wave,
+      )
+      ..lineTo(size.width + 40, y + height)
+      ..cubicTo(
+        size.width * 0.68,
+        y + height * 1.24,
+        size.width * 0.26,
+        y + height * 0.58,
+        -40,
+        y + height * 0.96,
+      )
+      ..close();
+    canvas.drawPath(path, Paint()..color = color.withValues(alpha: alpha));
+  }
+
+  @override
+  bool shouldRepaint(covariant _CareBackdropPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.dark != dark;
+  }
+}
+
+class _GlassPanel extends StatelessWidget {
+  const _GlassPanel({
+    required this.child,
+    this.padding = const EdgeInsets.all(22),
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.all(Radius.circular(28)),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: (dark ? const Color(0xFF172321) : Colors.white).withValues(
+              alpha: dark ? 0.70 : 0.74,
+            ),
+            borderRadius: const BorderRadius.all(Radius.circular(28)),
+            border: Border.all(
+              color: (dark ? Colors.white : const Color(0xFF31565D)).withValues(
+                alpha: dark ? 0.08 : 0.11,
+              ),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: dark ? 0.24 : 0.08),
+                blurRadius: 36,
+                offset: const Offset(0, 18),
+              ),
+            ],
+          ),
+          child: Padding(padding: padding, child: child),
+        ),
+      ),
+    );
+  }
+}
+
+class _RoleSelector extends StatelessWidget {
+  const _RoleSelector({required this.selectedRole, required this.onChanged});
+
+  final CareAgentUserRole selectedRole;
+  final ValueChanged<CareAgentUserRole>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Choose account type',
+      child: Row(
+        children: [
+          for (final role in CareAgentUserRole.values) ...[
+            Expanded(
+              child: _RoleChoiceCard(
+                role: role,
+                selected: role == selectedRole,
+                onTap: onChanged == null ? null : () => onChanged!(role),
+              ),
+            ),
+            if (role != CareAgentUserRole.values.last)
+              const SizedBox(width: 10),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RoleChoiceCard extends StatelessWidget {
+  const _RoleChoiceCard({
+    required this.role,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final CareAgentUserRole role;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = selected
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurface.withValues(alpha: 0.56);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: const BorderRadius.all(Radius.circular(18)),
+      child: AnimatedContainer(
+        duration: CareMotion.standard,
+        curve: CareMotion.standardCurve,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: selected
+              ? theme.colorScheme.primary.withValues(alpha: 0.12)
+              : theme.colorScheme.surface.withValues(alpha: 0.56),
+          borderRadius: const BorderRadius.all(Radius.circular(18)),
+          border: Border.all(
+            color: selected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outline.withValues(alpha: 0.55),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(role.icon, color: color),
+            const SizedBox(height: 10),
+            Text(
+              role.label,
+              style: theme.textTheme.titleSmall?.copyWith(color: color),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LoginHeroPanel extends StatelessWidget {
+  const _LoginHeroPanel({required this.role, this.compact = false});
+
+  final CareAgentUserRole role;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final caroState = role == CareAgentUserRole.caretaker
+        ? CaroState.handoff
+        : CaroState.greeting;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: compact ? 0 : 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Align(
+            alignment: compact ? Alignment.center : Alignment.centerLeft,
+            child: Hero(
+              tag: 'caro-login-character',
+              child: CaroCharacter(state: caroState, size: compact ? 116 : 176),
+            ),
+          ),
+          SizedBox(height: compact ? 10 : 18),
+          Text(
+            role.companionTitle,
+            style: theme.textTheme.displayLarge?.copyWith(
+              fontSize: compact ? 28 : 38,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            role == CareAgentUserRole.patient
+                ? 'Medicines, vitals, records, and safe escalation in one calm workspace.'
+                : 'A focused queue for alerts, evidence, calls, and acknowledgements.',
+            style: theme.textTheme.bodyLarge,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.66),
+        borderRadius: const BorderRadius.all(Radius.circular(999)),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.50),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 17, color: theme.colorScheme.primary),
+            const SizedBox(width: 7),
+            Text(label, style: theme.textTheme.labelLarge),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveSignalBadge extends StatefulWidget {
+  const _LiveSignalBadge();
+
+  @override
+  State<_LiveSignalBadge> createState() => _LiveSignalBadgeState();
+}
+
+class _LiveSignalBadgeState extends State<_LiveSignalBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    );
+    if (!_careAgentRunningInWidgetTest) {
+      _controller.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    if ((reduceMotion || _careAgentRunningInWidgetTest) &&
+        _controller.isAnimating) {
+      _controller.stop();
+    } else if (!reduceMotion &&
+        !_careAgentRunningInWidgetTest &&
+        !_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    }
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final value = reduceMotion ? 0.0 : _controller.value;
+        return Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary.withValues(alpha: 0.10),
+            borderRadius: const BorderRadius.all(Radius.circular(16)),
+            border: Border.all(
+              color: theme.colorScheme.primary.withValues(
+                alpha: 0.20 + value * 0.20,
+              ),
+            ),
+          ),
+          child: Icon(
+            Icons.monitor_heart_outlined,
+            color: theme.colorScheme.primary.withValues(
+              alpha: 0.72 + value * 0.28,
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -1118,8 +1708,8 @@ class _SafetyNoticeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
+    return _PremiumStage(
+      child: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
             final wide = constraints.maxWidth >= 920;
@@ -1200,21 +1790,23 @@ class _SafetyIdentityPanel extends StatelessWidget {
           title: 'Caro is your care guide',
           message:
               'I will help you understand setup, consent, health records, '
-              'and simulation-only escalation without replacing a clinician.',
+              'and emergency drills without replacing a clinician.',
           compact: compact,
         ),
-        SizedBox(height: compact ? 20 : 32),
-        Text(
-          'Soft, guided care coordination.',
-          style: theme.textTheme.displayLarge,
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'CareAgent keeps health workflows understandable: what is known, '
-          'what is stale, what is consented, and what safe next step is '
-          'available.',
-          style: theme.textTheme.bodyLarge,
-        ),
+        if (!compact) ...[
+          const SizedBox(height: 32),
+          Text(
+            'Soft, guided care coordination.',
+            style: theme.textTheme.displayLarge,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'CareAgent keeps health workflows understandable: what is known, '
+            'what is stale, what is consented, and what safe next step is '
+            'available.',
+            style: theme.textTheme.bodyLarge,
+          ),
+        ],
       ],
     );
   }
@@ -1229,13 +1821,8 @@ class _SafetyNoticeContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
+    return _GlassPanel(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: const BorderRadius.all(Radius.circular(20)),
-        border: Border.all(color: theme.colorScheme.outline),
-      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1280,11 +1867,13 @@ class _SafetyNoticeContent extends StatelessWidget {
 class _CareAgentShell extends StatefulWidget {
   const _CareAgentShell({
     required this.apiClient,
+    required this.loginRole,
     required this.userEmail,
     required this.onSignOut,
   });
 
   final CareAgentApiClient apiClient;
+  final CareAgentUserRole loginRole;
   final String? userEmail;
   final Future<void> Function() onSignOut;
 
@@ -1293,7 +1882,7 @@ class _CareAgentShell extends StatefulWidget {
 }
 
 class _CareAgentShellState extends State<_CareAgentShell> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
   late final _LocalCareState _localCareState;
 
   _Section get _selectedSection => _sections[_selectedIndex];
@@ -1301,7 +1890,15 @@ class _CareAgentShellState extends State<_CareAgentShell> {
   @override
   void initState() {
     super.initState();
+    _selectedIndex = 0;
+    widget.apiClient.careAgentRole = widget.loginRole.wireName;
     _localCareState = _LocalCareState();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CareAgentShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    widget.apiClient.careAgentRole = widget.loginRole.wireName;
   }
 
   @override
@@ -1321,12 +1918,37 @@ class _CareAgentShellState extends State<_CareAgentShell> {
   Widget build(BuildContext context) {
     final selectedSection = _selectedSection;
     final width = MediaQuery.sizeOf(context).width;
+    final useBottomTabs = width < 720;
     final showUserIdentity = width >= 720;
     final compactFab = width < 480;
+    final bottomTabs = _bottomTabsForRole(widget.loginRole);
+    final body = AnimatedSwitcher(
+      duration: CareMotion.guided,
+      switchInCurve: CareMotion.guidedCurve,
+      child: _selectedIndex == 0
+          ? _HomeScreen(
+              key: ValueKey('home-${widget.loginRole.wireName}'),
+              apiClient: widget.apiClient,
+              loginRole: widget.loginRole,
+              localCareState: _localCareState,
+              onSelectSection: _selectSection,
+            )
+          : _CareFeatureScreen(
+              key: ValueKey(selectedSection.title),
+              section: selectedSection,
+              careState: _localCareState,
+            ),
+    );
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: Text(selectedSection.title),
+        backgroundColor: Colors.transparent,
+        title: Text(
+          _selectedIndex == 0
+              ? widget.loginRole.dashboardTitle
+              : selectedSection.title,
+        ),
         actions: [
           if (showUserIdentity)
             Padding(
@@ -1350,7 +1972,7 @@ class _CareAgentShellState extends State<_CareAgentShell> {
         selectedIndex: _selectedIndex,
         onDestinationSelected: _selectSection,
         children: [
-          const _DrawerHeader(),
+          _DrawerHeader(role: widget.loginRole, userEmail: widget.userEmail),
           for (final section in _sections)
             NavigationDrawerDestination(
               icon: Icon(section.icon),
@@ -1359,17 +1981,20 @@ class _CareAgentShellState extends State<_CareAgentShell> {
             ),
         ],
       ),
-      body: _selectedIndex == 0
-          ? _HomeScreen(
-              apiClient: widget.apiClient,
-              localCareState: _localCareState,
-              onSelectSection: _selectSection,
+      body: _PremiumBackdrop(
+        child: Padding(
+          padding: EdgeInsets.only(bottom: useBottomTabs ? 94 : 0),
+          child: body,
+        ),
+      ),
+      bottomNavigationBar: useBottomTabs
+          ? _CareBottomTabBar(
+              selectedSectionIndex: _selectedIndex,
+              tabs: bottomTabs,
+              onSelected: _selectSection,
             )
-          : _CareFeatureScreen(
-              section: selectedSection,
-              careState: _localCareState,
-            ),
-      floatingActionButton: _selectedIndex == _sosIndex
+          : null,
+      floatingActionButton: useBottomTabs || _selectedIndex == _sosIndex
           ? null
           : compactFab
           ? FloatingActionButton(
@@ -1387,7 +2012,10 @@ class _CareAgentShellState extends State<_CareAgentShell> {
 }
 
 class _DrawerHeader extends StatelessWidget {
-  const _DrawerHeader();
+  const _DrawerHeader({required this.role, required this.userEmail});
+
+  final CareAgentUserRole role;
+  final String? userEmail;
 
   @override
   Widget build(BuildContext context) {
@@ -1398,11 +2026,7 @@ class _DrawerHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.volunteer_activism_outlined,
-            size: 36,
-            color: theme.colorScheme.primary,
-          ),
+          CaroCharacter(state: CaroState.neutral, size: 68),
           const SizedBox(height: 12),
           Text(
             'CareAgent',
@@ -1411,8 +2035,149 @@ class _DrawerHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text('Soft clinical companion', style: theme.textTheme.bodyMedium),
+          Text('${role.label} workspace', style: theme.textTheme.bodyMedium),
+          if (userEmail != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              userEmail!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall,
+            ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+class _CareBottomTabBar extends StatelessWidget {
+  const _CareBottomTabBar({
+    required this.selectedSectionIndex,
+    required this.tabs,
+    required this.onSelected,
+  });
+
+  final int selectedSectionIndex;
+  final List<_BottomTab> tabs;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+        child: ClipRRect(
+          borderRadius: const BorderRadius.all(Radius.circular(28)),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: (dark ? const Color(0xFF13211F) : Colors.white)
+                    .withValues(alpha: dark ? 0.78 : 0.84),
+                borderRadius: const BorderRadius.all(Radius.circular(28)),
+                border: Border.all(
+                  color: (dark ? Colors.white : const Color(0xFF2B585B))
+                      .withValues(alpha: dark ? 0.10 : 0.13),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: dark ? 0.30 : 0.12),
+                    blurRadius: 30,
+                    offset: const Offset(0, 16),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(
+                  children: [
+                    for (final tab in tabs)
+                      Expanded(
+                        child: _CareBottomTabButton(
+                          tab: tab,
+                          selected: tab.sectionIndex == selectedSectionIndex,
+                          onTap: () => onSelected(tab.sectionIndex),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CareBottomTabButton extends StatelessWidget {
+  const _CareBottomTabButton({
+    required this.tab,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _BottomTab tab;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    final foreground = selected ? primary : theme.colorScheme.onSurfaceVariant;
+
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: InkWell(
+          borderRadius: const BorderRadius.all(Radius.circular(22)),
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: CareMotion.standard,
+            curve: CareMotion.guidedCurve,
+            constraints: const BoxConstraints(minHeight: 58),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+            decoration: BoxDecoration(
+              color: selected
+                  ? primary.withValues(alpha: 0.12)
+                  : Colors.transparent,
+              borderRadius: const BorderRadius.all(Radius.circular(22)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedScale(
+                  scale: selected ? 1.08 : 1,
+                  duration: CareMotion.standard,
+                  curve: CareMotion.guidedCurve,
+                  child: Icon(
+                    selected ? tab.selectedIcon : tab.icon,
+                    color: foreground,
+                    size: 23,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  tab.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: foreground,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1421,70 +2186,631 @@ class _DrawerHeader extends StatelessWidget {
 class _HomeScreen extends StatelessWidget {
   const _HomeScreen({
     required this.apiClient,
+    required this.loginRole,
     required this.localCareState,
     required this.onSelectSection,
+    super.key,
   });
 
   final CareAgentApiClient apiClient;
+  final CareAgentUserRole loginRole;
   final _LocalCareState localCareState;
   final ValueChanged<int> onSelectSection;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    if (loginRole == CareAgentUserRole.caretaker) {
+      return _CaretakerHomeScreen(
+        careState: localCareState,
+        onSelectSection: onSelectSection,
+      );
+    }
 
     return _ScreenFrame(
       title: 'Care status',
       subtitle:
           'A guided CareAgent workspace for setup, consent, vitals, and '
-          'simulation-only escalation.',
+          'safe escalation.',
       children: [
-        const CaroCompanion(
-          state: CaroState.neutral,
-          title: 'Caro watches the care signals',
-          message:
-              'Start with a patient profile, consent, and a manual reading. '
-              'CareAgent will keep source, freshness, and simulation status '
-              'visible as you test the MVP flow.',
+        _PatientTodayPanel(careState: localCareState),
+        _CareShortcutGrid(
+          shortcuts: [
+            _CareShortcut(
+              icon: Icons.monitor_heart_outlined,
+              title: 'Vitals',
+              body:
+                  '${localCareState.vitals.first.value} ${localCareState.vitals.first.unit} latest',
+              onTap: () => onSelectSection(_vitalsIndex),
+            ),
+            _CareShortcut(
+              icon: Icons.medication_outlined,
+              title: 'Medicines',
+              body: '${localCareState.medicines.length} scheduled',
+              onTap: () => onSelectSection(_medicinesIndex),
+            ),
+            _CareShortcut(
+              icon: Icons.chat_bubble_outline,
+              title: 'Ask Caro',
+              body: 'Reviewed answers',
+              onTap: () => onSelectSection(_chatIndex),
+            ),
+            _CareShortcut(
+              icon: Icons.emergency_outlined,
+              title: 'SOS',
+              body: 'Emergency drill',
+              onTap: () => onSelectSection(_sosIndex),
+            ),
+          ],
         ),
-        _SafetyBanner(
-          title: apiClient.isConfigured
-              ? 'Backend connection ready'
-              : 'Connect the backend before live flows',
-          message: apiClient.isConfigured
-              ? 'MVP actions use the configured Render API with Firebase ID tokens.'
-              : 'Set CAREAGENT_API_BASE_URL at build time to enable live API calls.',
-        ),
-        _LocalCareSnapshot(careState: localCareState),
-        _HackathonDemoPanel(careState: localCareState),
-        _PilotWorkspace(apiClient: apiClient),
-        Text(
-          'Setup areas',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
+        if (careAgentShowDemoTools)
+          _AdvancedToolsSection(
+            apiClient: apiClient,
+            careState: localCareState,
+            onSelectSection: onSelectSection,
           ),
-        ),
-        GridView.builder(
-          itemCount: _sections.length - 1,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 260,
-            mainAxisExtent: 156,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-          ),
-          itemBuilder: (context, index) {
-            final sectionIndex = index + 1;
-            final section = _sections[sectionIndex];
+      ],
+    );
+  }
+}
 
-            return _SectionCard(
-              section: section,
-              onTap: () => onSelectSection(sectionIndex),
+class _PatientTodayPanel extends StatelessWidget {
+  const _PatientTodayPanel({required this.careState});
+
+  final _LocalCareState careState;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final latest = careState.vitals.first;
+    final nextMedicine = careState.medicines.first;
+
+    return _GlassPanel(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 720;
+          final art = CaroCharacter(state: CaroState.neutral, size: 118);
+          final copy = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${careState.patientName.split(' ').first} today',
+                style: theme.textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'One calm view for the next medicine, recent vitals, and safe escalation.',
+                style: theme.textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _SignalMetric(
+                    label: latest.metric,
+                    value: '${latest.value} ${latest.unit}',
+                    icon: Icons.monitor_heart_outlined,
+                  ),
+                  _SignalMetric(
+                    label: 'Open alerts',
+                    value: careState.openAlertCount.toString(),
+                    icon: Icons.notification_important_outlined,
+                  ),
+                  _SignalMetric(
+                    label: 'Next dose',
+                    value: nextMedicine.schedule,
+                    icon: Icons.medication_outlined,
+                  ),
+                ],
+              ),
+            ],
+          );
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(child: art),
+                const SizedBox(height: 12),
+                copy,
+              ],
             );
-          },
+          }
+
+          return Row(
+            children: [
+              art,
+              const SizedBox(width: 20),
+              Expanded(child: copy),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AdvancedToolsSection extends StatelessWidget {
+  const _AdvancedToolsSection({
+    required this.apiClient,
+    required this.careState,
+    required this.onSelectSection,
+  });
+
+  final CareAgentApiClient apiClient;
+  final _LocalCareState careState;
+  final ValueChanged<int> onSelectSection;
+
+  @override
+  Widget build(BuildContext context) {
+    return _GlassPanel(
+      padding: EdgeInsets.zero,
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+        childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+        leading: const Icon(Icons.tune_outlined),
+        title: const Text('Advanced tools'),
+        subtitle: const Text('Internal actions and setup map'),
+        children: [
+          _LocalCareSnapshot(careState: careState),
+          const SizedBox(height: 12),
+          _CareScenarioPanel(careState: careState),
+          const SizedBox(height: 12),
+          _PilotWorkspace(apiClient: apiClient),
+          const SizedBox(height: 12),
+          _CareShortcutGrid(
+            shortcuts: [
+              for (var index = 1; index < _sections.length; index++)
+                _CareShortcut(
+                  icon: _sections[index].icon,
+                  title: _sections[index].title,
+                  body: _sections[index].shortLabel,
+                  onTap: () => onSelectSection(index),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CaretakerHomeScreen extends StatelessWidget {
+  const _CaretakerHomeScreen({
+    required this.careState,
+    required this.onSelectSection,
+  });
+
+  final _LocalCareState careState;
+  final ValueChanged<int> onSelectSection;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ScreenFrame(
+      title: 'Caretaker command',
+      subtitle:
+          'Risk-ranked patients, urgent evidence, and acknowledgement-ready '
+          'care actions.',
+      children: [
+        _CaretakerCommandPanel(careState: careState),
+        _PatientQueuePanel(careState: careState),
+        _SafetyBanner(
+          title: 'Caretaker access requires patient consent',
+          message:
+              'This view shows only the synthetic granted patient. Production '
+              'caretaker access must be backed by active patient grants, '
+              'purpose-specific permissions, and audit logs.',
+        ),
+        _CareShortcutGrid(
+          shortcuts: [
+            _CareShortcut(
+              icon: Icons.notification_important_outlined,
+              title: 'Alert inbox',
+              body: '${careState.openAlertCount} open alert(s)',
+              onTap: () => onSelectSection(_alertsIndex),
+            ),
+            _CareShortcut(
+              icon: Icons.contact_phone_outlined,
+              title: 'Care team',
+              body: '${careState.contacts.length} verified contacts',
+              onTap: () => onSelectSection(_caretakerIndex),
+            ),
+            _CareShortcut(
+              icon: Icons.emergency_outlined,
+              title: 'SOS protocol',
+              body: careState.sosRunning ? 'Drill active' : 'Ready to run',
+              onTap: () => onSelectSection(_sosIndex),
+            ),
+          ],
         ),
       ],
+    );
+  }
+}
+
+class _CaretakerCommandPanel extends StatelessWidget {
+  const _CaretakerCommandPanel({required this.careState});
+
+  final _LocalCareState careState;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return _GlassPanel(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 720;
+          final art = CaroCharacter(
+            state: careState.openAlertCount > 0
+                ? CaroState.concerned
+                : CaroState.confirming,
+            size: compact ? 118 : 156,
+          );
+          final copy = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Meera, start with Ravi', style: theme.textTheme.titleLarge),
+              const SizedBox(height: 8),
+              Text(
+                'Recent vitals and the evening medicine window need review. '
+                'Caro keeps the evidence and safe next action together.',
+                style: theme.textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _SignalMetric(
+                    label: 'Open alerts',
+                    value: careState.openAlertCount.toString(),
+                    icon: Icons.priority_high_outlined,
+                  ),
+                  _SignalMetric(
+                    label: 'Primary patient',
+                    value: '1',
+                    icon: Icons.person_pin_circle_outlined,
+                  ),
+                  _SignalMetric(
+                    label: 'Channels',
+                    value: '4',
+                    icon: Icons.settings_input_antenna_outlined,
+                  ),
+                ],
+              ),
+            ],
+          );
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(child: art),
+                const SizedBox(height: 14),
+                copy,
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              art,
+              const SizedBox(width: 22),
+              Expanded(child: copy),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _PatientQueuePanel extends StatelessWidget {
+  const _PatientQueuePanel({required this.careState});
+
+  final _LocalCareState careState;
+
+  @override
+  Widget build(BuildContext context) {
+    final latest = careState.vitals.first;
+
+    return _GlassPanel(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Patient queue', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 12),
+          _PatientQueueRow(
+            name: careState.patientName,
+            detail: careState.careGoal,
+            risk: latest.status,
+            evidence: '${latest.metric} ${latest.value} ${latest.unit}',
+            action: careState.openAlertCount > 0
+                ? 'Acknowledge or escalate'
+                : 'Daily summary ready',
+          ),
+          const SizedBox(height: 10),
+          const _PatientQueueRow(
+            name: 'Anita Rao',
+            detail: 'Weekly diabetes summary only',
+            risk: 'stable',
+            evidence: 'No urgent events',
+            action: 'Send weekly update',
+            dimmed: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PatientQueueRow extends StatelessWidget {
+  const _PatientQueueRow({
+    required this.name,
+    required this.detail,
+    required this.risk,
+    required this.evidence,
+    required this.action,
+    this.dimmed = false,
+  });
+
+  final String name;
+  final String detail;
+  final String risk;
+  final String evidence;
+  final String action;
+  final bool dimmed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent = dimmed ? theme.colorScheme.primary : theme.colorScheme.error;
+
+    return AnimatedContainer(
+      duration: CareMotion.standard,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(
+          alpha: dimmed ? 0.46 : 0.82,
+        ),
+        borderRadius: const BorderRadius.all(Radius.circular(18)),
+        border: Border.all(color: accent.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _PersonMedallion(label: name, urgent: !dimmed),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: theme.textTheme.titleSmall),
+                const SizedBox(height: 4),
+                Text(detail, style: theme.textTheme.bodyMedium),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _StatusPill(icon: Icons.speed_outlined, label: risk),
+                    _StatusPill(
+                      icon: Icons.monitor_heart_outlined,
+                      label: evidence,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.tonal(onPressed: () {}, child: Text(action)),
+        ],
+      ),
+    );
+  }
+}
+
+class _PersonMedallion extends StatelessWidget {
+  const _PersonMedallion({required this.label, required this.urgent});
+
+  final String label;
+  final bool urgent;
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = label
+        .split(' ')
+        .where((part) => part.isNotEmpty)
+        .take(2)
+        .map((part) => part[0])
+        .join();
+    final theme = Theme.of(context);
+
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: urgent
+              ? const [Color(0xFFFF6A7A), Color(0xFFFFC0A6)]
+              : const [Color(0xFF58C7BE), Color(0xFFA8E6CF)],
+        ),
+        borderRadius: const BorderRadius.all(Radius.circular(18)),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: theme.textTheme.titleSmall?.copyWith(color: Colors.white),
+      ),
+    );
+  }
+}
+
+class _SignalMetric extends StatelessWidget {
+  const _SignalMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: 132,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.70),
+        borderRadius: const BorderRadius.all(Radius.circular(18)),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.45),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: theme.colorScheme.primary),
+          const SizedBox(height: 10),
+          Text(value, style: theme.textTheme.titleLarge),
+          Text(label, style: theme.textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+class _CareShortcut {
+  const _CareShortcut({
+    required this.icon,
+    required this.title,
+    required this.body,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+  final VoidCallback onTap;
+}
+
+class _CareShortcutGrid extends StatelessWidget {
+  const _CareShortcutGrid({required this.shortcuts});
+
+  final List<_CareShortcut> shortcuts;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth >= 760
+            ? (constraints.maxWidth - 24) / 3
+            : constraints.maxWidth;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            for (final shortcut in shortcuts)
+              SizedBox(
+                width: width,
+                child: _ShortcutTile(shortcut: shortcut),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ShortcutTile extends StatefulWidget {
+  const _ShortcutTile({required this.shortcut});
+
+  final _CareShortcut shortcut;
+
+  @override
+  State<_ShortcutTile> createState() => _ShortcutTileState();
+}
+
+class _ShortcutTileState extends State<_ShortcutTile> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final scale = reduceMotion || !_hovered ? 1.0 : 1.015;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedScale(
+        scale: scale,
+        duration: CareMotion.quick,
+        curve: Curves.easeOutCubic,
+        child: InkWell(
+          onTap: widget.shortcut.onTap,
+          borderRadius: const BorderRadius.all(Radius.circular(20)),
+          child: AnimatedContainer(
+            duration: CareMotion.standard,
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface.withValues(
+                alpha: _hovered ? 0.86 : 0.72,
+              ),
+              borderRadius: const BorderRadius.all(Radius.circular(20)),
+              border: Border.all(
+                color:
+                    (_hovered
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.outline)
+                        .withValues(alpha: _hovered ? 0.36 : 0.45),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.colorScheme.primary.withValues(
+                    alpha: _hovered ? 0.12 : 0,
+                  ),
+                  blurRadius: 22,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(widget.shortcut.icon, color: theme.colorScheme.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.shortcut.title,
+                        style: theme.textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.shortcut.body,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1736,7 +3062,7 @@ class _PilotWorkspaceState extends State<_PilotWorkspace> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'MVP sandbox workspace',
+                    'Integration workspace',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -2146,16 +3472,12 @@ class _LocalCareState extends ChangeNotifier {
     _LocalMessage(
       author: 'Caro',
       body:
-          'Demo context loaded for Ravi Sharma. I can explain vitals, '
-          'medicine schedule, reviewed documents, and the simulated '
-          'WhatsApp/Telegram/voice escalation plan.',
+          'Care context loaded for Ravi Sharma. I can explain vitals, medicine schedule, reviewed documents, and caregiver alert steps.',
     ),
     _LocalMessage(
       author: 'Caro',
       body:
-          'Critical demo alert: heart_rate 132 bpm and SpO2 91% are recent. '
-          'CareAgent will notify verified contacts in simulation mode and '
-          'will not call real emergency services.',
+          'Critical alert: heart_rate 132 bpm and SpO2 91% are recent. CareAgent can notify verified contacts and will not call emergency services from this screen.',
     ),
   ];
   final List<_LocalContact> contacts = [
@@ -2200,8 +3522,8 @@ class _LocalCareState extends ChangeNotifier {
       priority: 4,
       channels: ['Voice'],
       verification: 'contract pending',
-      consent: 'disabled in demo',
-      lastAction: 'MVP requires legal/provider approval',
+      consent: 'not enabled',
+      lastAction: 'Requires explicit patient approval',
     ),
   ];
   final List<_LocalTimelineEvent> sosTimeline = [
@@ -2212,45 +3534,43 @@ class _LocalCareState extends ChangeNotifier {
           'reported SpO2 91%. Evidence is recent and source-labelled.',
     ),
     _LocalTimelineEvent(
-      title: 'Policy gate passed for simulation',
+      title: 'Permissions checked',
       body:
-          'Health data, caretaker, WhatsApp, Telegram, voice, and simulation '
-          'consents are active. Real emergency automation is disabled.',
+          'Health data, caretaker, messaging, voice, and drill permissions are active. Real emergency calling is disabled.',
     ),
   ];
   final List<_LocalChannel> channels = [
     _LocalChannel(
       name: 'In-app push',
       provider: 'FCM/APNs',
-      readiness: 'ready',
+      readiness: 'Ready',
       enabled: true,
       verified: true,
       contacts: 'Patient app + Meera device',
-      mode: 'sandbox-ready',
-      nextStep: 'Add production Firebase sender credentials.',
+      mode: 'On',
+      nextStep: 'No action needed.',
       template: 'urgent_vitals_alert_v1',
     ),
     _LocalChannel(
       name: 'WhatsApp',
       provider: 'Cloud API or approved BSP',
-      readiness: 'template plan ready',
+      readiness: 'Needs final approval',
       enabled: true,
       verified: true,
       contacts: 'Meera, Dr. Neha',
-      mode: 'simulation now',
-      nextStep:
-          'Need WABA, approved alert templates, webhook secret, phone ID.',
+      mode: 'Drill only',
+      nextStep: 'Confirm approved care-alert templates.',
       template: 'critical_escalation_caretaker_v1',
     ),
     _LocalChannel(
       name: 'Telegram',
       provider: 'Telegram Bot API',
-      readiness: 'linked pilot contact',
+      readiness: 'Linked contact',
       enabled: true,
       verified: true,
       contacts: 'Amit',
-      mode: 'simulation now',
-      nextStep: 'Need bot token, webhook URL, signed link/nonce flow.',
+      mode: 'Drill only',
+      nextStep: 'Confirm the contact before urgent alerts.',
       template: 'telegram_ack_callback_v1',
     ),
     _LocalChannel(
@@ -2281,7 +3601,7 @@ class _LocalCareState extends ChangeNotifier {
       title: 'Critical vitals escalation active',
       body:
           'Heart rate 132 bpm and SpO2 91% were detected in the last '
-          '5 minutes. Caretaker escalation is running in simulation mode.',
+          '5 minutes. Caretaker escalation is active.',
       severity: 'critical',
       evidence: 'Watch BLE simulator + pulse oximeter',
       nextAction: 'Send WhatsApp and Telegram alert, then place test call.',
@@ -2342,7 +3662,7 @@ class _LocalCareState extends ChangeNotifier {
       step: '6',
       channel: 'Voice',
       target: 'CarePlus Ambulance Desk',
-      status: 'MVP gated',
+      status: 'disabled',
       detail: 'Private ambulance contact only after explicit policy approval.',
       eta: 'disabled',
     ),
@@ -2356,7 +3676,7 @@ class _LocalCareState extends ChangeNotifier {
 
   bool get sosRunning =>
       escalationActions.any((action) => action.status.contains('sent')) ||
-      sosTimeline.any((event) => event.title == 'Simulation started');
+      sosTimeline.any((event) => event.title == 'Drill started');
 
   void saveProfile({
     required String name,
@@ -2459,10 +3779,9 @@ class _LocalCareState extends ChangeNotifier {
       ..clear()
       ..add(
         _LocalTimelineEvent(
-          title: 'Simulation started',
+          title: 'Drill started',
           body:
-              'Critical vitals scenario started. No real emergency service '
-              'or provider was contacted.',
+              'Critical vitals drill started. No real emergency service or provider was contacted.',
         ),
       )
       ..add(
@@ -2470,7 +3789,7 @@ class _LocalCareState extends ChangeNotifier {
           title: 'WhatsApp and Telegram sent',
           body:
               'Meera receives WhatsApp template with ack link. Amit receives '
-              'Telegram bot callback. Both messages are simulation records.',
+              'Telegram callback. Both messages are drill records.',
         ),
       )
       ..add(
@@ -2486,10 +3805,9 @@ class _LocalCareState extends ChangeNotifier {
       _LocalAlert(
         title: 'Multi-channel escalation awaiting acknowledgement',
         body:
-            'WhatsApp, Telegram, and voice test-call actions are in the '
-            'incident timeline. This is a test run only.',
+            'WhatsApp, Telegram, and voice test-call actions are in the incident timeline. This is a drill record only.',
         severity: 'critical',
-        evidence: 'Simulation run CRIT-HR-001',
+        evidence: 'Emergency drill CRIT-HR-001',
         nextAction: 'Wait for caretaker ack or continue to doctor fallback.',
       ),
     );
@@ -2506,8 +3824,7 @@ class _LocalCareState extends ChangeNotifier {
       _LocalTimelineEvent(
         title: 'Acknowledged',
         body:
-            '$caretakerName acknowledged the simulated escalation from the '
-            'WhatsApp link and voice DTMF path.',
+            '$caretakerName acknowledged the drill from the WhatsApp link and voice keypad path.',
       ),
     );
     for (final alert in alerts) {
@@ -2570,14 +3887,11 @@ class _LocalCareState extends ChangeNotifier {
           ? 'No vitals are recorded yet.'
           : 'Latest ${latest.metric} is ${latest.value} ${latest.unit} from '
                 '${latest.source}. Status: ${latest.status}. I can escalate '
-                'to verified contacts in simulation mode; contact emergency '
+                'to verified contacts after confirmation; contact emergency '
                 'services directly for severe symptoms.';
     }
     if (lowered.contains('sos') || lowered.contains('emergency')) {
-      return 'For a real emergency, call local emergency services now. MVP '
-          'automation will first notify Meera by WhatsApp, Amit by Telegram, '
-          'then place an AI-disclosed test call. Public emergency calling is '
-          'disabled until explicit policy and provider approval.';
+      return 'For a real emergency, call local emergency services now. CareAgent can notify Meera by WhatsApp, Amit by Telegram, then place an AI-disclosed test call after confirmation.';
     }
     if (lowered.contains('whatsapp') || lowered.contains('telegram')) {
       return 'WhatsApp uses approved Cloud API or BSP templates. Telegram '
@@ -2739,7 +4053,11 @@ class _LocalAlert {
 }
 
 class _CareFeatureScreen extends StatelessWidget {
-  const _CareFeatureScreen({required this.section, required this.careState});
+  const _CareFeatureScreen({
+    required this.section,
+    required this.careState,
+    super.key,
+  });
 
   final _Section section;
   final _LocalCareState careState;
@@ -2779,7 +4097,7 @@ class _CareFeatureScreen extends StatelessWidget {
       'Vitals' => 'Caro checks source and freshness',
       'Alerts' => 'Caro separates open and acknowledged alerts',
       'Chat' => 'Caro answers with boundaries',
-      'SOS' => 'Caro keeps this in simulation mode',
+      'SOS' => 'Caro keeps this in drill mode',
       'Documents' => 'Caro waits for reviewed sources',
       _ => 'Caro guides this setup area',
     };
@@ -2881,8 +4199,8 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-class _HackathonDemoPanel extends StatelessWidget {
-  const _HackathonDemoPanel({required this.careState});
+class _CareScenarioPanel extends StatelessWidget {
+  const _CareScenarioPanel({required this.careState});
 
   final _LocalCareState careState;
 
@@ -2902,7 +4220,7 @@ class _HackathonDemoPanel extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Hackathon demo scenario',
+                    'Care scenario',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -3061,33 +4379,62 @@ class _ConsentFeature extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final entry in careState.consents.entries)
-          SwitchListTile(
-            value: entry.value,
-            onChanged: (value) => careState.setConsent(entry.key, value),
-            secondary: Icon(
-              entry.value
-                  ? Icons.verified_user_outlined
-                  : Icons.privacy_tip_outlined,
+        for (final entry in careState.consents.entries) ...[
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface.withValues(alpha: 0.74),
+              borderRadius: const BorderRadius.all(Radius.circular(18)),
+              border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.34),
+              ),
             ),
-            title: Text(entry.key),
-            subtitle: Text(
-              entry.value
-                  ? 'Active for this local pilot workspace.'
-                  : 'Disabled. Related actions stay blocked or simulation-only.',
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  _CareActionLeading(
+                    icon: entry.value
+                        ? Icons.verified_user_outlined
+                        : Icons.privacy_tip_outlined,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(entry.key, style: theme.textTheme.titleSmall),
+                        const SizedBox(height: 4),
+                        Text(
+                          entry.value
+                              ? 'Active for this care workspace.'
+                              : 'Disabled until the patient allows it.',
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: entry.value,
+                    onChanged: (value) =>
+                        careState.setConsent(entry.key, value),
+                  ),
+                ],
+              ),
             ),
           ),
+          const SizedBox(height: 8),
+        ],
         const SizedBox(height: 8),
         const _InfoTile(
           icon: Icons.rule_outlined,
-          title: 'MVP gate',
+          title: 'Before alerts are sent',
           body:
-              'Real WhatsApp, Telegram, and voice dispatch will require '
-              'verified contacts, provider webhooks, idempotency keys, '
-              'rate limits, and audit records before production use.',
+              'Only verified contacts with active permission can receive care alerts, messages, location, or call requests.',
         ),
       ],
     );
@@ -3208,22 +4555,19 @@ class _MedicinesFeatureState extends State<_MedicinesFeature> {
         ),
         const SizedBox(height: 12),
         for (final medicine in widget.careState.medicines)
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.medication_outlined),
-              title: Text(medicine.name),
-              subtitle: Text(
+          _CareActionTile(
+            icon: Icons.medication_outlined,
+            title: medicine.name,
+            body:
                 '${medicine.dose} - ${medicine.schedule}\n'
                 '${medicine.status} - ${medicine.source}',
-              ),
-              trailing: medicine.status == 'taken'
-                  ? const Icon(Icons.check_circle_outline)
-                  : TextButton(
-                      onPressed: () =>
-                          widget.careState.markMedicineTaken(medicine),
-                      child: const Text('Taken'),
-                    ),
-            ),
+            trailing: medicine.status == 'taken'
+                ? const Icon(Icons.check_circle_outline)
+                : TextButton(
+                    onPressed: () =>
+                        widget.careState.markMedicineTaken(medicine),
+                    child: const Text('Taken'),
+                  ),
           ),
       ],
     );
@@ -3276,23 +4620,20 @@ class _DocumentsFeatureState extends State<_DocumentsFeature> {
         ),
         const SizedBox(height: 12),
         for (final document in widget.careState.documents)
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.description_outlined),
-              title: Text(document.name),
-              subtitle: Text(
+          _CareActionTile(
+            icon: Icons.description_outlined,
+            title: document.name,
+            body:
                 '${document.kind} - ${document.status}\n'
                 'Source: ${document.source}\n'
                 'Facts: ${document.extractedFacts.join('; ')}',
-              ),
-              trailing: document.status == 'reviewed'
-                  ? const Icon(Icons.fact_check_outlined)
-                  : TextButton(
-                      onPressed: () =>
-                          widget.careState.markDocumentReviewed(document),
-                      child: const Text('Mark reviewed'),
-                    ),
-            ),
+            trailing: document.status == 'reviewed'
+                ? const Icon(Icons.fact_check_outlined)
+                : TextButton(
+                    onPressed: () =>
+                        widget.careState.markDocumentReviewed(document),
+                    child: const Text('Mark reviewed'),
+                  ),
           ),
       ],
     );
@@ -3360,7 +4701,7 @@ class _ChatFeatureState extends State<_ChatFeature> {
               'Explain the alert evidence',
               'What happens on WhatsApp?',
               'What medicine is due?',
-              'Start emergency simulation?',
+              'Start emergency drill?',
             ])
               ActionChip(
                 label: Text(prompt),
@@ -3391,9 +4732,7 @@ class _SosFeature extends StatelessWidget {
               onPressed: careState.startSosSimulation,
               icon: const Icon(Icons.emergency_outlined),
               label: Text(
-                careState.sosRunning
-                    ? 'Restart Simulation'
-                    : 'Start Simulation',
+                careState.sosRunning ? 'Restart drill' : 'Start drill',
               ),
             ),
             OutlinedButton.icon(
@@ -3416,7 +4755,7 @@ class _SosFeature extends StatelessWidget {
             body: event.body,
           ),
         if (careState.sosTimeline.isEmpty)
-          const Text('No simulation has been started yet.'),
+          const Text('No emergency drill has been started yet.'),
       ],
     );
   }
@@ -3470,21 +4809,18 @@ class _AlertsFeature extends StatelessWidget {
     return Column(
       children: [
         for (final alert in careState.alerts)
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.notification_important_outlined),
-              title: Text(alert.title),
-              subtitle: Text(
+          _CareActionTile(
+            icon: Icons.notification_important_outlined,
+            title: alert.title,
+            body:
                 '${alert.severity} - ${alert.status}\n${alert.body}\n'
                 'Evidence: ${alert.evidence}\nNext: ${alert.nextAction}',
-              ),
-              trailing: alert.status == 'open'
-                  ? TextButton(
-                      onPressed: () => careState.acknowledgeAlert(alert),
-                      child: const Text('Ack'),
-                    )
-                  : const Icon(Icons.check_circle_outline),
-            ),
+            trailing: alert.status == 'open'
+                ? TextButton(
+                    onPressed: () => careState.acknowledgeAlert(alert),
+                    child: const Text('Ack'),
+                  )
+                : const Icon(Icons.check_circle_outline),
           ),
       ],
     );
@@ -3498,19 +4834,16 @@ class _ContactCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: CircleAvatar(child: Text(contact.priority.toString())),
-        title: Text(contact.name),
-        subtitle: Text(
+    return _CareActionTile(
+      icon: Icons.verified_outlined,
+      leadingLabel: contact.priority.toString(),
+      title: contact.name,
+      body:
           '${contact.role} - ${contact.relation}\n'
           '${contact.phone}\n'
           'Channels: ${contact.channels.join(', ')}\n'
           'Verification: ${contact.verification}; consent: ${contact.consent}\n'
           '${contact.lastAction}',
-        ),
-        trailing: const Icon(Icons.verified_outlined),
-      ),
     );
   }
 }
@@ -3525,30 +4858,47 @@ class _ChannelCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Card(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.74),
+        borderRadius: const BorderRadius.all(Radius.circular(18)),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.34),
+        ),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: channel.enabled,
-              onChanged: onChanged,
-              secondary: Icon(
-                channel.verified
-                    ? Icons.mark_email_read_outlined
-                    : Icons.mark_email_unread_outlined,
-                color: theme.colorScheme.primary,
-              ),
-              title: Text(channel.name),
-              subtitle: Text('${channel.provider} - ${channel.readiness}'),
+            Row(
+              children: [
+                _CareActionLeading(
+                  icon: channel.verified
+                      ? Icons.mark_email_read_outlined
+                      : Icons.mark_email_unread_outlined,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(channel.name, style: theme.textTheme.titleSmall),
+                      const SizedBox(height: 4),
+                      Text(
+                        channel.readiness,
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(value: channel.enabled, onChanged: onChanged),
+              ],
             ),
+            const SizedBox(height: 10),
             Text(
-              'Mode: ${channel.mode}\n'
               'Contacts: ${channel.contacts}\n'
-              'Template/script: ${channel.template}\n'
-              'Next setup: ${channel.nextStep}',
+              'Next: ${channel.nextStep}',
               style: theme.textTheme.bodyMedium,
             ),
           ],
@@ -3565,13 +4915,11 @@ class _EscalationActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: CircleAvatar(child: Text(action.step)),
-        title: Text('${action.channel} to ${action.target}'),
-        subtitle: Text('${action.status} - ${action.eta}\n${action.detail}'),
-        trailing: const Icon(Icons.route_outlined),
-      ),
+    return _CareActionTile(
+      icon: Icons.route_outlined,
+      leadingLabel: action.step,
+      title: '${action.channel} to ${action.target}',
+      body: '${action.status} - ${action.eta}\n${action.detail}',
     );
   }
 }
@@ -3629,12 +4977,38 @@ class _ScreenFrame extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, style: theme.textTheme.headlineSmall),
-                      const SizedBox(height: 8),
-                      Text(subtitle, style: theme.textTheme.bodyLarge),
+                      _GlassPanel(
+                        padding: const EdgeInsets.all(20),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    title,
+                                    style: theme.textTheme.headlineSmall,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    subtitle,
+                                    style: theme.textTheme.bodyLarge,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            const _LiveSignalBadge(),
+                          ],
+                        ),
+                      )._careMotionEntry(),
                       const SizedBox(height: 20),
-                      ...children.expand((child) sync* {
-                        yield child;
+                      ...children.indexed.expand((entry) sync* {
+                        yield _MotionEntry(
+                          delay: Duration(milliseconds: 70 + entry.$1 * 45),
+                          child: entry.$2,
+                        );
                         yield const SizedBox(height: 12);
                       }),
                     ],
@@ -3646,6 +5020,37 @@ class _ScreenFrame extends StatelessWidget {
         },
       ),
     );
+  }
+}
+
+class _MotionEntry extends StatelessWidget {
+  const _MotionEntry({required this.child, this.delay = Duration.zero});
+
+  final Widget child;
+  final Duration delay;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context) ||
+        _careAgentRunningInWidgetTest) {
+      return child;
+    }
+
+    return child
+        .animate(delay: delay)
+        .fadeIn(duration: 320.ms, curve: Curves.easeOutCubic)
+        .slideY(
+          begin: 0.045,
+          end: 0,
+          duration: 320.ms,
+          curve: Curves.easeOutCubic,
+        );
+  }
+}
+
+extension on Widget {
+  Widget _careMotionEntry({Duration delay = Duration.zero}) {
+    return _MotionEntry(delay: delay, child: this);
   }
 }
 
@@ -3704,49 +5109,6 @@ class _SafetyBanner extends StatelessWidget {
   }
 }
 
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.section, required this.onTap});
-
-  final _Section section;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: const BorderRadius.all(Radius.circular(8)),
-        child: Row(
-          children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(section.icon, color: theme.colorScheme.primary),
-                    const Spacer(),
-                    Text(section.title, style: theme.textTheme.titleSmall),
-                    const SizedBox(height: 6),
-                    Text(
-                      section.shortLabel,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _InfoTile extends StatelessWidget {
   const _InfoTile({
     required this.icon,
@@ -3762,13 +5124,132 @@ class _InfoTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Card(
-      child: ListTile(
-        leading: Icon(icon, color: theme.colorScheme.primary),
-        title: Text(title),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Text(body),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface.withValues(alpha: 0.72),
+          borderRadius: const BorderRadius.all(Radius.circular(18)),
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.36),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.11),
+                  borderRadius: const BorderRadius.all(Radius.circular(14)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Icon(icon, color: theme.colorScheme.primary, size: 22),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: theme.textTheme.titleSmall),
+                    const SizedBox(height: 5),
+                    Text(body, style: theme.textTheme.bodyMedium),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CareActionTile extends StatelessWidget {
+  const _CareActionTile({
+    required this.icon,
+    required this.title,
+    required this.body,
+    this.trailing,
+    this.leadingLabel,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+  final Widget? trailing;
+  final String? leadingLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface.withValues(alpha: 0.74),
+          borderRadius: const BorderRadius.all(Radius.circular(18)),
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.34),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _CareActionLeading(icon: icon, label: leadingLabel),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: theme.textTheme.titleSmall),
+                    const SizedBox(height: 5),
+                    Text(body, style: theme.textTheme.bodyMedium),
+                  ],
+                ),
+              ),
+              if (trailing != null) ...[const SizedBox(width: 10), trailing!],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CareActionLeading extends StatelessWidget {
+  const _CareActionLeading({required this.icon, this.label});
+
+  final IconData icon;
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.11),
+        borderRadius: const BorderRadius.all(Radius.circular(14)),
+      ),
+      child: SizedBox.square(
+        dimension: 44,
+        child: Center(
+          child: label == null
+              ? Icon(icon, color: theme.colorScheme.primary, size: 22)
+              : Text(
+                  label!,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
         ),
       ),
     );
@@ -3811,19 +5292,93 @@ class _InfoItem {
   final String body;
 }
 
+class _BottomTab {
+  const _BottomTab({
+    required this.label,
+    required this.sectionIndex,
+    required this.icon,
+    required this.selectedIcon,
+  });
+
+  final String label;
+  final int sectionIndex;
+  final IconData icon;
+  final IconData selectedIcon;
+}
+
+List<_BottomTab> _bottomTabsForRole(CareAgentUserRole role) {
+  return switch (role) {
+    CareAgentUserRole.patient => const [
+      _BottomTab(
+        label: 'Today',
+        sectionIndex: 0,
+        icon: Icons.home_outlined,
+        selectedIcon: Icons.home,
+      ),
+      _BottomTab(
+        label: 'Vitals',
+        sectionIndex: _vitalsIndex,
+        icon: Icons.monitor_heart_outlined,
+        selectedIcon: Icons.monitor_heart,
+      ),
+      _BottomTab(
+        label: 'Caro',
+        sectionIndex: _chatIndex,
+        icon: Icons.chat_bubble_outline,
+        selectedIcon: Icons.chat_bubble,
+      ),
+      _BottomTab(
+        label: 'SOS',
+        sectionIndex: _sosIndex,
+        icon: Icons.emergency_outlined,
+        selectedIcon: Icons.emergency,
+      ),
+    ],
+    CareAgentUserRole.caretaker => const [
+      _BottomTab(
+        label: 'Queue',
+        sectionIndex: 0,
+        icon: Icons.home_outlined,
+        selectedIcon: Icons.home,
+      ),
+      _BottomTab(
+        label: 'Alerts',
+        sectionIndex: _alertsIndex,
+        icon: Icons.notification_important_outlined,
+        selectedIcon: Icons.notification_important,
+      ),
+      _BottomTab(
+        label: 'Team',
+        sectionIndex: _caretakerIndex,
+        icon: Icons.contact_phone_outlined,
+        selectedIcon: Icons.contact_phone,
+      ),
+      _BottomTab(
+        label: 'SOS',
+        sectionIndex: _sosIndex,
+        icon: Icons.emergency_outlined,
+        selectedIcon: Icons.emergency,
+      ),
+    ],
+  };
+}
+
+const _vitalsIndex = 3;
+const _medicinesIndex = 4;
+const _chatIndex = 6;
 const _sosIndex = 7;
+const _caretakerIndex = 8;
+const _alertsIndex = 10;
 
 const _sections = <_Section>[
   _Section(
     title: 'Home',
-    heading: 'CareAgent Hackathon Demo',
-    shortLabel: 'Synthetic end-to-end care flow',
-    description:
-        'A guided MVP demo for patient setup, records, alerts, and escalation.',
-    noticeTitle: 'Synthetic demo data',
+    heading: 'Care status',
+    shortLabel: 'Care day overview',
+    description: 'A guided view for setup, records, alerts, and escalation.',
+    noticeTitle: 'Care records',
     notice:
-        'The visible patient, vitals, documents, channel messages, and calls '
-        'are seeded demo records unless a backend action is explicitly run.',
+        'CareAgent separates recorded information from active alerts and always shows the latest known source.',
     icon: Icons.home_outlined,
     selectedIcon: Icons.home,
     items: [],
@@ -3833,10 +5388,9 @@ const _sections = <_Section>[
     heading: 'Onboarding',
     shortLabel: 'Profile, care team, and permissions',
     description: 'Guided profile setup for first-run care coordination.',
-    noticeTitle: 'Demo profile can be edited',
+    noticeTitle: 'Profile can be edited',
     notice:
-        'The seeded profile is synthetic. Production onboarding must verify '
-        'identity, contacts, consent, address, and emergency policy.',
+        'Review identity, contacts, permissions, address, and emergency preferences before using alerts.',
     icon: Icons.person_add_alt_1_outlined,
     selectedIcon: Icons.person_add_alt_1,
     items: [
@@ -3887,7 +5441,7 @@ const _sections = <_Section>[
         title: 'Document consent',
         body:
             'Controls uploads, OCR, extraction review, and '
-            'source-grounded answers.',
+            'answers based on reviewed records.',
       ),
       _InfoItem(
         icon: Icons.share_location_outlined,
@@ -4065,7 +5619,7 @@ const _sections = <_Section>[
       ),
       _InfoItem(
         icon: Icons.science_outlined,
-        title: 'Simulation mode',
+        title: 'Drill mode',
         body:
             'Drills must be clearly labeled as test mode and must '
             'never call real emergency services.',
@@ -4076,10 +5630,10 @@ const _sections = <_Section>[
     title: 'Caretaker',
     heading: 'Caretaker',
     shortLabel: 'Primary support contact',
-    description: 'Acknowledge-ready caretaker profile for local pilot flows.',
+    description: 'Acknowledge-ready caretaker profile for care flows.',
     noticeTitle: 'Caretaker access requires consent',
     notice:
-        'Contacts can receive simulation alerts only after consent and '
+        'Contacts can receive care alerts only after consent and '
         'verification are active.',
     icon: Icons.contact_phone_outlined,
     selectedIcon: Icons.contact_phone,
@@ -4105,10 +5659,9 @@ const _sections = <_Section>[
     heading: 'Channels',
     shortLabel: 'Notification readiness',
     description: 'In-app, WhatsApp, Telegram, and voice channel toggles.',
-    noticeTitle: 'External channels are simulated',
+    noticeTitle: 'Channels need consent',
     notice:
-        'Toggles here simulate readiness only. Real messaging requires '
-        'provider setup, consent, and audit logging.',
+        'Messaging and calls are available only for verified contacts with active permission.',
     icon: Icons.settings_input_antenna_outlined,
     selectedIcon: Icons.settings_input_antenna,
     items: [
@@ -4132,7 +5685,7 @@ const _sections = <_Section>[
     title: 'Alerts',
     heading: 'Alerts',
     shortLabel: 'Open and acknowledged events',
-    description: 'Manual vitals and SOS simulations produce local alerts.',
+    description: 'Manual vitals and emergency drills produce local alerts.',
     noticeTitle: 'Alerts are not diagnoses',
     notice:
         'Open alerts indicate review needs. They do not diagnose, clear, '

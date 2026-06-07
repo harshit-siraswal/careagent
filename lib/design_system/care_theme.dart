@@ -82,7 +82,7 @@ abstract final class CareTheme {
       colorScheme: scheme,
       useMaterial3: true,
       scaffoldBackgroundColor: scaffoldBackground,
-      fontFamily: 'Nunito Sans',
+      fontFamily: 'Avenir Next',
       textTheme: textTheme,
       appBarTheme: AppBarTheme(
         centerTitle: false,
@@ -120,15 +120,15 @@ abstract final class CareTheme {
         filled: true,
         fillColor: surfaceSoft,
         border: OutlineInputBorder(
-          borderRadius: const BorderRadius.all(Radius.circular(12)),
+          borderRadius: const BorderRadius.all(Radius.circular(16)),
           borderSide: BorderSide(color: subtleBorder),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: const BorderRadius.all(Radius.circular(12)),
+          borderRadius: const BorderRadius.all(Radius.circular(16)),
           borderSide: BorderSide(color: subtleBorder),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: const BorderRadius.all(Radius.circular(12)),
+          borderRadius: const BorderRadius.all(Radius.circular(16)),
           borderSide: BorderSide(color: scheme.primary, width: 1.5),
         ),
       ),
@@ -136,7 +136,7 @@ abstract final class CareTheme {
         style: FilledButton.styleFrom(
           minimumSize: const Size(44, 44),
           shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
+            borderRadius: BorderRadius.all(Radius.circular(16)),
           ),
           textStyle: textTheme.labelLarge?.copyWith(
             fontWeight: FontWeight.w700,
@@ -148,7 +148,7 @@ abstract final class CareTheme {
           minimumSize: const Size(44, 44),
           side: BorderSide(color: subtleBorder),
           shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
+            borderRadius: BorderRadius.all(Radius.circular(16)),
           ),
           textStyle: textTheme.labelLarge?.copyWith(
             fontWeight: FontWeight.w700,
@@ -183,42 +183,42 @@ abstract final class CareTheme {
   static TextTheme _textTheme(Color primary, Color secondary) {
     return TextTheme(
       displayLarge: TextStyle(
-        fontFamily: 'Sora',
-        fontSize: 32,
-        height: 1.25,
+        fontFamily: 'Avenir Next',
+        fontSize: 36,
+        height: 1.12,
         color: primary,
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.w800,
       ),
       headlineMedium: TextStyle(
-        fontFamily: 'Sora',
+        fontFamily: 'Avenir Next',
         fontSize: 28,
         height: 1.28,
         color: primary,
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.w800,
       ),
       headlineSmall: TextStyle(
-        fontFamily: 'Sora',
+        fontFamily: 'Avenir Next',
         fontSize: 24,
         height: 1.33,
         color: primary,
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.w800,
       ),
       titleLarge: TextStyle(
-        fontFamily: 'Sora',
+        fontFamily: 'Avenir Next',
         fontSize: 24,
         height: 1.33,
         color: primary,
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.w800,
       ),
       titleMedium: TextStyle(
-        fontFamily: 'Sora',
+        fontFamily: 'Avenir Next',
         fontSize: 20,
         height: 1.4,
         color: primary,
         fontWeight: FontWeight.w700,
       ),
       titleSmall: TextStyle(
-        fontFamily: 'Sora',
+        fontFamily: 'Avenir Next',
         fontSize: 17,
         height: 1.4,
         color: primary,

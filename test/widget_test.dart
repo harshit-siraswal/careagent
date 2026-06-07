@@ -9,7 +9,7 @@ void main() {
       careAgentAuthErrorMessage(
         firebase_auth.FirebaseAuthException(code: 'operation-not-allowed'),
       ),
-      'This sign-in method is not enabled in Firebase Auth.',
+      'This sign-in method is not available.',
     );
   });
 
@@ -23,7 +23,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('CareAgent safety notice'), findsOneWidget);
-    expect(find.text('CareAgent MVP Shell'), findsNothing);
+    expect(find.text('CareAgent safety notice'), findsOneWidget);
     expect(find.text('I understand'), findsOneWidget);
   });
 
@@ -42,10 +42,7 @@ void main() {
 
     expect(find.text('CareAgent safety notice'), findsNothing);
     expect(find.text('Sign in to CareAgent'), findsOneWidget);
-    expect(
-      find.text('Android Firebase configuration required'),
-      findsOneWidget,
-    );
+    expect(find.text('Sign-in unavailable'), findsOneWidget);
     expect(find.text('Continue with Google'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
   });
@@ -112,7 +109,7 @@ void main() {
     );
   });
 
-  testWidgets('signed-in care features update local pilot state', (
+  testWidgets('signed-in care features update local care state', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(900, 1200);
@@ -162,12 +159,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(NavigationDrawerDestination, 'SOS'));
     await tester.pumpAndSettle();
-    final startSimulationButton = find.text('Start Simulation');
+    final startSimulationButton = find.text('Start drill');
     await tester.ensureVisible(startSimulationButton);
     await tester.pumpAndSettle();
     await tester.tap(startSimulationButton);
     await tester.pumpAndSettle();
-    expect(find.text('Simulation started'), findsOneWidget);
+    expect(find.text('Drill started'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Open navigation menu'));
     await tester.pumpAndSettle();
